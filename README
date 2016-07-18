@@ -1,0 +1,3 @@
+**Warning:** Unfortunately, Tensorflow's API is still moving fast,
+so it might be some work to train/apply on the latest tensorflow.
+This work was originally done using Tensorflow 0.7.0.
