@@ -37,21 +37,27 @@ def rnn_layers(
         lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
             lstm_cell, output_keep_prob=dropout)
     cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * num_layers, state_is_tuple=False)
-    if bidirectional:
-        lstm_bcell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
-        bcell = tf.nn.rnn_cell.MultiRNNCell([lstm_bcell] * num_layers, state_is_tuple=False)
-        return tf.nn.bidirectional_rnn(
-            cell,
-            bcell,
-            inputs,
-            dtype=tf.float32,
-            sequence_length=seq_lens)
-    else:
+
+    if not bidirectional:
         return tf.nn.rnn(
             cell,
             inputs,
             dtype=tf.float32,
             sequence_length=seq_lens)
+
+
+    lstm_bcell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
+    if dropout < 1:
+        lstm_bcell = tf.nn.rnn_cell.DropoutWrapper(
+            lstm_bcell, output_keep_prob=dropout)
+    bcell = tf.nn.rnn_cell.MultiRNNCell([lstm_bcell] * num_layers, state_is_tuple=False)
+
+    return tf.nn.bidirectional_rnn(
+        cell,
+        bcell,
+        inputs,
+        dtype=tf.float32,
+        sequence_length=seq_lens)
 
 
 class TopoModel:
