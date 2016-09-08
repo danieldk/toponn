@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
 import tensorflow as tf
-from tensorflow.models.rnn import rnn, rnn_cell
 from enum import Enum
-
 
 class Phase(Enum):
     train = 1
@@ -34,22 +32,22 @@ def rnn_layers(
         seq_lens=None,
         bidirectional=False):
     seq_lens = None
-    lstm_cell = rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
     if dropout < 1:
-        lstm_cell = rnn_cell.DropoutWrapper(
+        lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
             lstm_cell, output_keep_prob=dropout)
-    cell = rnn_cell.MultiRNNCell([lstm_cell] * num_layers)
+    cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * num_layers, state_is_tuple=False)
     if bidirectional:
-        lstm_bcell = rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0)
-        bcell = rnn_cell.MultiRNNCell([lstm_bcell] * num_layers)
-        return rnn.bidirectional_rnn(
+        lstm_bcell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
+        bcell = tf.nn.rnn_cell.MultiRNNCell([lstm_bcell] * num_layers, state_is_tuple=False)
+        return tf.nn.bidirectional_rnn(
             cell,
             bcell,
             inputs,
             dtype=tf.float32,
             sequence_length=seq_lens)
     else:
-        return rnn.rnn(
+        return tf.nn.rnn(
             cell,
             inputs,
             dtype=tf.float32,
@@ -104,7 +102,7 @@ class TopoModel:
 
         # outputs, _, _ = rnn_layers(inputs, num_layers=1, output_size=size,
         #    dropout=keep_prob, seq_lens=seq_lens, bidirectional=True)
-        outputs = rnn_layers(
+        outputs, _, _ = rnn_layers(
             inputs,
             num_layers=1,
             output_size=size,

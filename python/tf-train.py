@@ -147,7 +147,7 @@ def train_model(
             print("Epoch: %d Validation loss: %.3f" % (i + 1, valid_loss))
             print("Epoch: %d Validation accuracy: %.3f" % (i + 1, accs))
 
-            save_path = saver.save(session, "model", global_step=i + 1)
+            save_path = saver.save(session, "./model", global_step=i + 1)
 
 if __name__ == "__main__":
     tf.app.run()
