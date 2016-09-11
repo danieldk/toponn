@@ -5,6 +5,7 @@ import (
 	"flag"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 
 	"github.com/danieldk/conllx"
@@ -119,9 +120,12 @@ func labelBatch(session *tensorflow.Session, numberer *label.LabelNumberer, batc
 
 	for idx, sent := range batchSentences {
 		sentencePredictions := predictions.Get([]int{idx})
-		for tokenIdx := range sent {
-			label := numberer.Label(int(sentencePredictions[tokenIdx]))
-			sent[tokenIdx].SetFeatures(map[string]string{"tf": label})
+		for tokenIdx := 0; tokenIdx < common.MinInt(len(sentencePredictions), len(sent)); tokenIdx++ {
+			if label, ok := numberer.Label(int(sentencePredictions[tokenIdx])); ok {
+				sent[tokenIdx].SetFeatures(map[string]string{"tf": label})
+			} else {
+				log.Printf("Impossible label predicted (0 is padding): %d\n", sentencePredictions[tokenIdx])
+			}
 		}
 	}
 }

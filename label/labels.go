@@ -34,8 +34,12 @@ func (l *LabelNumberer) Number(label string) int {
 	return idx
 }
 
-func (l LabelNumberer) Label(number int) string {
-	return l.labels[number-1]
+func (l LabelNumberer) Label(number int) (string, bool) {
+	if number < 1 || number > len(l.labels) {
+		return "", false
+	}
+
+	return l.labels[number-1], true
 }
 
 func (l LabelNumberer) Size() int {
