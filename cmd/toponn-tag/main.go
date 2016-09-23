@@ -122,7 +122,17 @@ func labelBatch(session *tensorflow.Session, numberer *label.LabelNumberer, batc
 		sentencePredictions := predictions.Get([]int{idx})
 		for tokenIdx := 0; tokenIdx < common.MinInt(len(sentencePredictions), len(sent)); tokenIdx++ {
 			if label, ok := numberer.Label(int(sentencePredictions[tokenIdx])); ok {
-				sent[tokenIdx].SetFeatures(map[string]string{"tf": label})
+				var featureMap map[string]string
+
+				if features, ok := sent[tokenIdx].Features(); ok {
+					featureMap = features.FeaturesMap()
+				} else {
+					featureMap = make(map[string]string)
+				}
+
+				// Add topological field feature.
+				featureMap["tf"] = label
+				sent[tokenIdx].SetFeatures(featureMap)
 			} else {
 				log.Printf("Impossible label predicted (0 is padding): %d\n", sentencePredictions[tokenIdx])
 			}
