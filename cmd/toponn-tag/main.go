@@ -27,7 +27,9 @@ func mustReadGraph(config *common.TopoNNConfig) *tensorflow.Session {
 	defer opts.Close()
 	opts.SetConfig(tfconf)
 
-	session, err := tensorflow.NewSession(opts)
+	graph := tensorflow.NewGraph()
+
+	session, err := tensorflow.NewSession(graph, opts)
 	common.ExitIfError("Could not open Tensorflow session: ", err)
 
 	f, err := os.Open(config.TensorFlow.Graph)
