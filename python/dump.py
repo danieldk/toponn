@@ -36,12 +36,12 @@ class DefaultConfig:
 
 
 def usage():
-    print("Usage: %s weights_in graph_ouy" % sys.argv[0])
+    print("Usage: %s config train_data weights graph_out" % sys.argv[0])
     sys.exit(1)
 
 
 def main(unused_args):
-    if len(unused_args) != 4:
+    if len(unused_args) != 5:
         usage()
 
     config = get_config()
@@ -53,7 +53,7 @@ def main(unused_args):
     tfconfig = tf.ConfigProto(gpu_options=gpuopts)
 
     with tf.Graph().as_default(), tf.Session(config=tfconfig) as session, \
-            h5py.File(unused_args[1], 'r') as train_data:
+            h5py.File(unused_args[2], 'r') as train_data:
         data_shape = train_data['batch0']['inputs'].shape
         batch_size = data_shape[0]
         num_steps = data_shape[1]
@@ -87,12 +87,12 @@ def main(unused_args):
 
         tf.initialize_all_variables().run()
 
-        saver.restore(session, unused_args[2])
+        saver.restore(session, unused_args[3])
 
         tf.train.write_graph(
             session.graph.as_graph_def(),
             '/tmp/my-model',
-            unused_args[3])
+            unused_args[4])
 
 if __name__ == "__main__":
     tf.app.run()

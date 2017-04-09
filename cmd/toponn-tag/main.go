@@ -116,7 +116,10 @@ func main() {
 }
 
 func labelBatch(session *tensorflow.Session, numberer *label.LabelNumberer, batchSentences []conllx.Sentence, batch *tensorflow.Float32Tensor) {
-	outputs, err := session.Run(map[string]tensorflow.Tensor{"model_2/inputs": batch}, []string{"model_2/predictions"})
+	batchNative := batch.ToNative()
+	defer batchNative.Close()
+
+	outputs, err := session.Run(map[string]*tensorflow.NativeTensor{"model_2/inputs": batchNative}, []string{"model_2/predictions"})
 	common.ExitIfError("Error running graph: ", err)
 	predictions := outputs["model_2/predictions"].(*tensorflow.Int32Tensor)
 

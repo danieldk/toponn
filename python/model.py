@@ -32,27 +32,27 @@ def rnn_layers(
         seq_lens=None,
         bidirectional=False):
     seq_lens = None
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
+    lstm_cell = tf.contrib.rnn.BasicLSTMCell(output_size, forget_bias=1.0)
     if dropout < 1:
-        lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
+        lstm_cell = tf.contrib.rnn.DropoutWrapper(
             lstm_cell, output_keep_prob=dropout)
-    cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * num_layers, state_is_tuple=False)
+    cell = tf.contrib.rnn.MultiRNNCell([lstm_cell] * num_layers)
 
     if not bidirectional:
-        return tf.nn.rnn(
+        return tf.contrib.rnn.static_rnn(
             cell,
             inputs,
             dtype=tf.float32,
             sequence_length=seq_lens)
 
 
-    lstm_bcell = tf.nn.rnn_cell.BasicLSTMCell(output_size, forget_bias=1.0, state_is_tuple=False)
+    lstm_bcell = tf.contrib.rnn.BasicLSTMCell(output_size, forget_bias=1.0)
     if dropout < 1:
-        lstm_bcell = tf.nn.rnn_cell.DropoutWrapper(
+        lstm_bcell = tf.contrib.rnn.DropoutWrapper(
             lstm_bcell, output_keep_prob=dropout)
-    bcell = tf.nn.rnn_cell.MultiRNNCell([lstm_bcell] * num_layers, state_is_tuple=False)
+    bcell = tf.contrib.rnn.MultiRNNCell([lstm_bcell] * num_layers)
 
-    return tf.nn.bidirectional_rnn(
+    return tf.contrib.rnn.static_bidirectional_rnn(
         cell,
         bcell,
         inputs,
@@ -104,7 +104,7 @@ class TopoModel:
           inputs = self._input_data
 
         inputs = tf.transpose(inputs, [1, 0, 2])
-        inputs = tf.unpack(inputs)
+        inputs = tf.unstack(inputs)
 
         # outputs, _, _ = rnn_layers(inputs, num_layers=1, output_size=size,
         #    dropout=keep_prob, seq_lens=seq_lens, bidirectional=True)
@@ -119,7 +119,7 @@ class TopoModel:
         outputs, _ = rnn_layers(outputs, num_layers=1, output_size=size,
                                 dropout=keep_prob, seq_lens=seq_lens)
 
-        output = tf.concat(0, outputs)
+        output = tf.concat(outputs, 0)
 
         softmax_w = tf.get_variable("softmax_w", [size, num_labels])
         softmax_b = tf.get_variable("softmax_b", [num_labels])
@@ -127,7 +127,7 @@ class TopoModel:
 
         if phase in (Phase.train, Phase.validation):
             losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-                logits, tf.cast(y, tf.int64))
+                logits = logits, labels = tf.cast(y, tf.int64))
 
             # Shape: (num_steps, batch_size)
             loss_mask = tf.transpose(input_mask, [1, 0])
@@ -136,7 +136,7 @@ class TopoModel:
             loss_mask = tf.cast(loss_mask, tf.float32)
 
             # Zero out losses for inactive steps.
-            losses = tf.mul(loss_mask, losses)
+            losses = tf.multiply(loss_mask, losses)
 
             # Compensate for padded losses.
             losses = tf.truediv(losses, tf.reduce_mean(loss_mask))
@@ -151,7 +151,7 @@ class TopoModel:
             correct = tf.cast(correct, tf.float32)
 
             # Zero out correctness for inactive steps.
-            correct = tf.mul(loss_mask, correct)
+            correct = tf.multiply(loss_mask, correct)
 
             # Compensate for inactive steps
             correct = tf.truediv(correct, tf.reduce_mean(loss_mask))
