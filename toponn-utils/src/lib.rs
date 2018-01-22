@@ -22,6 +22,9 @@ pub use config::{Config, Embedding, Embeddings, Labeler};
 mod error;
 pub use error::*;
 
+mod process;
+pub use process::SentProcessor;
+
 mod serialization;
 pub use serialization::{CborRead, CborWrite, TomlRead};
 
