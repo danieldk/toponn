@@ -6,7 +6,7 @@ use tf_embed;
 use tf_embed::ReadWord2Vec;
 
 use toponn::LayerEmbeddings;
-use toponn::tensorflow::Model;
+use toponn::tensorflow::ModelConfig;
 
 use {ErrorKind, Result};
 
@@ -14,7 +14,7 @@ use {ErrorKind, Result};
 pub struct Config {
     pub labeler: Labeler,
     pub embeddings: Embeddings,
-    pub model: Model,
+    #[serde(rename = "model")] pub model: ModelConfig,
 }
 
 impl Config {

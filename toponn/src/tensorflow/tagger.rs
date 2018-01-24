@@ -12,7 +12,7 @@ use tf_proto::ConfigProto;
 const INITIAL_SEQUENCE_LENGTH: usize = 100;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Model {
+pub struct ModelConfig {
     /// Model batch size, should be kept constant between training and
     /// prediction.
     pub batch_size: usize,
@@ -65,7 +65,7 @@ impl Tagger {
         mut r: R,
         vectorizer: SentVectorizer,
         labels: Numberer<String>,
-        model: &Model,
+        model: &ModelConfig,
     ) -> Result<Self>
     where
         R: Read,
@@ -185,7 +185,7 @@ impl Tag for Tagger {
     }
 }
 
-fn tf_model_to_protobuf(model: &Model) -> Result<Vec<u8>> {
+fn tf_model_to_protobuf(model: &ModelConfig) -> Result<Vec<u8>> {
     let mut config_proto = ConfigProto::new();
     config_proto.intra_op_parallelism_threads = model.intra_op_parallelism_threads as i32;
     config_proto.inter_op_parallelism_threads = model.inter_op_parallelism_threads as i32;

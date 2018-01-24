@@ -1,4 +1,4 @@
 mod tagger;
-pub use self::tagger::{Model, OpNames, Tagger};
+pub use self::tagger::{ModelConfig, OpNames, Tagger};
 
 mod tensor;
