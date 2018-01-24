@@ -10,7 +10,7 @@ use toponn::tensorflow::ModelConfig;
 
 use {ErrorKind, Result};
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Config {
     pub labeler: Labeler,
     pub embeddings: Embeddings,
@@ -35,13 +35,13 @@ impl Config {
     }
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Embeddings {
     pub word: Embedding,
     pub tag: Embedding,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Embedding {
     pub filename: String,
     pub normalize: bool,
@@ -67,7 +67,7 @@ impl Embeddings {
     }
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Labeler {
     pub labels: String,
 }

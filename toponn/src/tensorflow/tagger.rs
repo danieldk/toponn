@@ -11,7 +11,7 @@ use tf_proto::ConfigProto;
 
 const INITIAL_SEQUENCE_LENGTH: usize = 100;
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ModelConfig {
     /// Model batch size, should be kept constant between training and
     /// prediction.
@@ -40,7 +40,7 @@ impl ModelConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OpNames {
     pub token_embeds_op: String,
     pub tag_embeds_op: String,
