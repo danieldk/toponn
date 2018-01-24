@@ -32,6 +32,14 @@ pub struct ModelConfig {
     pub inter_op_parallelism_threads: usize,
 }
 
+impl ModelConfig {
+    pub fn new_session(&self, model: &Model) -> Result<Session> {
+        let mut session_opts = SessionOptions::new();
+        session_opts.set_config(&tf_model_to_protobuf(&self)?)?;
+        Ok(Session::new(&session_opts, &model.graph)?)
+    }
+}
+
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OpNames {
     pub token_embeds_op: String,
@@ -44,12 +52,11 @@ pub struct OpNames {
     pub predicted_op: String,
 }
 
-pub struct Tagger {
-    session: Session,
-
+pub struct Model {
     vectorizer: SentVectorizer,
     labels: Numberer<String>,
-    builder: TensorBuilder,
+
+    graph: Graph,
 
     token_embeds_op: Operation,
     tokens_op: Operation,
@@ -60,7 +67,7 @@ pub struct Tagger {
     predicted_op: Operation,
 }
 
-impl Tagger {
+impl Model {
     pub fn load_graph<R>(
         mut r: R,
         vectorizer: SentVectorizer,
@@ -77,10 +84,6 @@ impl Tagger {
         let mut graph = Graph::new();
         graph.import_graph_def(&data, &opts)?;
 
-        let mut session_opts = SessionOptions::new();
-        session_opts.set_config(&tf_model_to_protobuf(&model)?)?;
-        let session = Session::new(&session_opts, &graph)?;
-
         let op_names = &model.op_names;
 
         let token_embeds_op = graph.operation_by_name_required(&op_names.token_embeds_op)?;
@@ -92,12 +95,11 @@ impl Tagger {
 
         let predicted_op = graph.operation_by_name_required(&op_names.predicted_op)?;
 
-        Ok(Tagger {
-            session,
-
+        Ok(Model {
             vectorizer,
             labels,
-            builder: TensorBuilder::new(model.batch_size, INITIAL_SEQUENCE_LENGTH),
+
+            graph,
 
             tokens_op,
             tags_op,
@@ -106,6 +108,22 @@ impl Tagger {
             tag_embeds_op,
             predicted_op,
         })
+    }
+}
+
+pub struct Tagger<'a> {
+    model: &'a Model,
+    builder: TensorBuilder,
+    session: &'a mut Session,
+}
+
+impl<'a> Tagger<'a> {
+    pub fn new(model_config: &ModelConfig, model: &'a Model, session: &'a mut Session) -> Self {
+        Tagger {
+            model,
+            builder: TensorBuilder::new(model_config.batch_size, INITIAL_SEQUENCE_LENGTH),
+            session,
+        }
     }
 
     fn ensure_builder_seq_len(&mut self, len: usize) {
@@ -119,18 +137,22 @@ impl Tagger {
     fn tag_sequences(&mut self) -> Result<Tensor<i32>> {
         let mut step = StepWithGraph::new();
 
-        let embeds = self.vectorizer.layer_embeddings();
+        let embeds = self.model.vectorizer.layer_embeddings();
 
         // Embedding inputs
-        step.add_input(&self.token_embeds_op, 0, embeds.token_embeddings().data());
-        step.add_input(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
+        step.add_input(
+            &self.model.token_embeds_op,
+            0,
+            embeds.token_embeddings().data(),
+        );
+        step.add_input(&self.model.tag_embeds_op, 0, embeds.tag_embeddings().data());
 
         // Sequence inputs
-        step.add_input(&self.seq_lens_op, 0, self.builder.seq_lens());
-        step.add_input(&self.tokens_op, 0, self.builder.tokens());
-        step.add_input(&self.tags_op, 0, self.builder.tags());
+        step.add_input(&self.model.seq_lens_op, 0, self.builder.seq_lens());
+        step.add_input(&self.model.tokens_op, 0, self.builder.tokens());
+        step.add_input(&self.model.tags_op, 0, self.builder.tags());
 
-        let predictions_token = step.request_output(&self.predicted_op, 0);
+        let predictions_token = step.request_output(&self.model.predicted_op, 0);
 
         self.session.run(&mut step)?;
 
@@ -138,7 +160,7 @@ impl Tagger {
     }
 }
 
-impl Tag for Tagger {
+impl<'a> Tag for Tagger<'a> {
     fn tag_sentences(&mut self, sentences: &[Sentence]) -> Result<Vec<Vec<&str>>> {
         if sentences.len() > self.builder.batch_size() {
             bail!(ErrorKind::IncorrectBatchSize(
@@ -159,7 +181,7 @@ impl Tag for Tagger {
 
         // Fill the batch.
         for sentence in sentences {
-            let input = self.vectorizer.realize(sentence)?;
+            let input = self.model.vectorizer.realize(sentence)?;
             self.builder.add(&input);
         }
 
@@ -167,7 +189,7 @@ impl Tag for Tagger {
         let tag_tensor = self.tag_sequences()?;
 
         // Convert label numbers to labels.
-        let numberer = &self.labels;
+        let numberer = &self.model.labels;
         let mut labels = Vec::new();
         for (idx, sentence) in sentences.iter().enumerate() {
             let seq_len = min(tag_tensor.dims()[1] as usize, sentence.as_tokens().len());

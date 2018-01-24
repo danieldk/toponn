@@ -14,7 +14,7 @@ use {ErrorKind, Result};
 pub struct Config {
     pub labeler: Labeler,
     pub embeddings: Embeddings,
-    #[serde(rename = "model")] pub model: ModelConfig,
+    pub model: ModelConfig,
 }
 
 impl Config {

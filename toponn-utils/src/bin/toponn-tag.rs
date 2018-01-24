@@ -20,7 +20,7 @@ use getopts::Options;
 use stdinout::{Input, OrExit, Output};
 
 use toponn::{Numberer, SentVectorizer, Tag};
-use toponn::tensorflow::Tagger;
+use toponn::tensorflow::{Model, Tagger};
 use toponn_utils::{CborRead, Config, Result, TomlRead};
 
 fn print_usage(program: &str, opts: Options) {
@@ -82,8 +82,13 @@ fn main() {
         ),
         1,
     );
-    let tagger = Tagger::load_graph(graph_reader, vectorizer, labels, &config.model)
+    let model = Model::load_graph(graph_reader, vectorizer, labels, &config.model)
         .or_exit("Cannot load computation graph", 1);
+    let mut session = config
+        .model
+        .new_session(&model)
+        .or_exit("Cannot create Tensorflow session", 1);
+    let tagger = Tagger::new(&config.model, &model, &mut session);
 
     let mut sent_proc = SentProcessor::new(tagger, writer, config.model.batch_size);
 
