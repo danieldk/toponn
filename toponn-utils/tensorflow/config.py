@@ -12,5 +12,5 @@ def path_relative_to_conf(conf_path, file_path):
     if path.isabs(file_path):
         return path
 
-    return "%s/%s" % (path.dirname(conf_path), file_path)
+    return "%s/%s" % (path.dirname(path.abspath(conf_path)), file_path)
 
