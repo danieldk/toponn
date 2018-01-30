@@ -92,7 +92,7 @@ class TopoModel:
 
         hidden_states = tf.reshape(hidden_states, [-1, config.hidden_size])
         
-        hidden_states = batch_norm(hidden_states, scale = True, decay=0.98, is_training = phase == Phase.train, reuse = phase != Phase.train, scope = "input_norm", updates_collections=None)
+        hidden_states = batch_norm(hidden_states, scale = True, decay=0.98, fused=False, is_training = phase == Phase.train, reuse = phase != Phase.train, scope = "input_norm", updates_collections=None)
 
         softmax_w = tf.get_variable("softmax_w", [config.hidden_size, config.num_outputs])
         softmax_b = tf.get_variable("softmax_b", [config.num_outputs])
