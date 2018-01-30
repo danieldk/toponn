@@ -103,12 +103,12 @@ impl SentVectorizer {
                 .pos()
                 .ok_or(ErrorKind::MissingPOSTag(format!("{}", token)))?;
 
-            input.tokens.push(lookup_value_or_null(
+            input.tokens.push(lookup_value_or_unknown(
                 self.layer_embeddings.token_embeddings.indices(),
                 form,
             ));
 
-            input.tags.push(lookup_value_or_null(
+            input.tags.push(lookup_value_or_unknown(
                 self.layer_embeddings.tag_embeddings.indices(),
                 pos,
             ));
@@ -118,14 +118,14 @@ impl SentVectorizer {
     }
 }
 
-fn lookup_value_or_null(m: &HashMap<String, usize>, value: &str) -> i32 {
+fn lookup_value_or_unknown(m: &HashMap<String, usize>, value: &str) -> i32 {
     if let Some(idx) = m.get(value) {
         *idx as i32
     } else {
-        lookup_null(m)
+        lookup_unknown(m)
     }
 }
 
-fn lookup_null(m: &HashMap<String, usize>) -> i32 {
-    m.get("<NULL-TOKEN>").cloned().unwrap_or(0) as i32
+fn lookup_unknown(m: &HashMap<String, usize>) -> i32 {
+    m.get("<UNKNOWN-TOKEN>").cloned().unwrap_or(0) as i32
 }
