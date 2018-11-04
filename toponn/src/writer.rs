@@ -180,9 +180,9 @@ impl Drop for HDF5Writer {
     fn drop(&mut self) {
         if self.batch_idx > 0 {
             self.write_batch().expect("Cannot write last batch");
-            self.file
-                .write("batches", self.batch + 1)
-                .expect("Cannot write last batch");
         }
+        self.file
+            .write("batches", self.batch)
+            .expect("Cannot write last batch");
     }
 }
