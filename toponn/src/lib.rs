@@ -32,7 +32,7 @@ pub use tag::Tag;
 pub mod tensorflow;
 
 mod writer;
-pub use writer::{Collector, HDF5Collector};
+pub use writer::{Collector, HDF5Collector, NoopCollector};
 
 #[cfg(test)]
 mod tests {

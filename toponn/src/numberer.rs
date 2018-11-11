@@ -27,6 +27,10 @@ where
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.values.len() + self.start_at
+    }
+
     /// Add an value. If the value has already been encountered before,
     /// the corresponding number is returned.
     pub fn add(&mut self, value: T) -> usize {
