@@ -78,10 +78,10 @@ fn main() {
         .or_exit("Cannot load embeddings", 1);
     let vectorizer = SentVectorizer::new(embeddings);
 
-    let graph_reader = File::open(&config.model.filename).or_exit(
+    let graph_reader = File::open(&config.model.graph).or_exit(
         format!(
             "Cannot open computation graph '{}' for reading",
-            &config.model.filename
+            &config.model.graph
         ),
         1,
     );

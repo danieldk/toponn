@@ -3,8 +3,6 @@ extern crate conllx;
 #[macro_use]
 extern crate failure;
 
-extern crate hdf5;
-
 extern crate itertools;
 
 extern crate protobuf;
@@ -27,12 +25,12 @@ mod numberer;
 pub use numberer::Numberer;
 
 mod tag;
-pub use tag::Tag;
+pub use tag::{ModelPerformance, Tag};
 
 pub mod tensorflow;
 
 mod writer;
-pub use writer::{Collector, HDF5Collector, NoopCollector};
+pub use writer::{Collector, NoopCollector};
 
 #[cfg(test)]
 mod tests {

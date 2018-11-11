@@ -1,13 +1,9 @@
 extern crate conllx;
-
 extern crate failure;
-
 extern crate getopts;
-
+extern crate indicatif;
 extern crate stdinout;
-
 extern crate toponn;
-
 extern crate toponn_utils;
 
 use std::env::args;
@@ -19,13 +15,18 @@ use std::process;
 use conllx::ReadSentence;
 use failure::Error;
 use getopts::Options;
+use indicatif::{ProgressBar, ProgressStyle};
 use stdinout::OrExit;
 
-use toponn::{Collector, HDF5Collector, Numberer, SentVectorizer};
-use toponn_utils::{CborRead, CborWrite, Config, TomlRead};
+use toponn::tensorflow::{CollectedTensors, LearningRateSchedule, Tagger, TensorCollector};
+use toponn::{Collector, Numberer, SentVectorizer};
+use toponn_utils::{CborRead, Config, FileProgress, TomlRead};
 
 fn print_usage(program: &str, opts: Options) {
-    let brief = format!("Usage: {} [options] CONFIG DATA OUTPUT.HDF5", program);
+    let brief = format!(
+        "Usage: {} [options] CONFIG TRAINING_DATA VALIDATION_DATA",
+        program
+    );
     print!("{}", opts.usage(&brief));
     process::exit(1);
 }
@@ -57,11 +58,21 @@ fn main() {
         .relativize_paths(&matches.free[0])
         .or_exit("Cannot relativize paths in configuration", 1);
 
-    let input_file = File::open(&matches.free[1])
-        .or_exit(format!("Cannot open '{}' for reading", &matches.free[0]), 1);
-    let reader = conllx::Reader::new(BufReader::new(input_file));
+    eprintln!("Vectorizing training instances...");
+    let train_tensors = collect_tensors(&config, &matches.free[1]);
+    eprintln!("Vectorizing validation instances...");
+    let validation_tensors = collect_tensors(&config, &matches.free[2]);
 
-    let labels = load_labels_or_new(&config).or_exit(
+    train_model(&config, train_tensors, validation_tensors)
+        .or_exit("Error while training model", 1);
+}
+
+fn train_model(
+    config: &Config,
+    train_tensors: CollectedTensors,
+    validation_tensors: CollectedTensors,
+) -> Result<(), Error> {
+    let labels = load_labels(&config).or_exit(
         format!(
             "Cannot load or create label file '{}'",
             config.labeler.labels
@@ -75,13 +86,125 @@ fn main() {
         .or_exit("Cannot load embeddings", 1);
     let vectorizer = SentVectorizer::new(embeddings);
 
-    let mut collector = HDF5Collector::new(
-        &matches.free[2],
-        labels,
-        vectorizer,
-        config.model.batch_size,
-    ).or_exit(format!("Cannot create HDF file '{}'", &matches.free[2]), 1);
+    let graph_read = BufReader::new(File::open(&config.model.graph)?);
+    let mut tagger = Tagger::load_graph(graph_read, vectorizer, labels, &config.model)?;
 
+    let mut best_epoch = 0;
+    let mut best_acc = 0.0;
+
+    let lr_schedule = config.train.lr_schedule();
+
+    for epoch in 0.. {
+        let lr = lr_schedule.learning_rate(epoch);
+
+        let (loss, acc) = run_epoch(&mut tagger, &train_tensors, true, lr);
+
+        eprintln!(
+            "Epoch {} (train, lr: {:.4}): loss: {:.4}, acc: {:.4}",
+            epoch, lr, loss, acc
+        );
+
+        tagger
+            .save(format!("epoch-{}", epoch))
+            .or_exit(format!("Cannot save model for epoch {}", epoch), 1);
+
+        let (_, acc) = run_epoch(&mut tagger, &validation_tensors, false, lr);
+
+        if acc > best_acc {
+            best_epoch = epoch;
+            best_acc = acc;
+        }
+
+        eprintln!(
+            "Epoch {} (validation): loss: {:.4}, acc: {:.4}, best epoch: {}, best acc: {:.4}",
+            epoch, loss, acc, best_epoch, best_acc
+        );
+
+        if epoch - best_epoch == config.train.patience {
+            eprintln!(
+                "Lost my patience! Best epoch: {} with accuracy: {:.4}",
+                best_epoch, acc
+            );
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn run_epoch(
+    tagger: &mut Tagger,
+    tensors: &CollectedTensors,
+    is_training: bool,
+    lr: f32,
+) -> (f32, f32) {
+    let epoch_type = if is_training { "train" } else { "validation" };
+
+    let mut instances = 0;
+    let mut acc = 0f32;
+    let mut loss = 0f32;
+
+    let progress = ProgressBar::new(tensors.labels.len() as u64);
+    progress.set_style(
+        ProgressStyle::default_bar()
+            .template(&format!("{{bar}} {} batch {{pos}}/{{len}}", epoch_type)),
+    );
+
+    for i in 0..tensors.labels.len() {
+        let seq_lens = &tensors.sequence_lens[i];
+        let tokens = &tensors.tokens[i];
+        let tags = &tensors.tags[i];
+        let labels = &tensors.labels[i];
+
+        let batch_perf = if is_training {
+            tagger.train(seq_lens, tokens, tags, labels, lr)
+        } else {
+            tagger.validate(seq_lens, tokens, tags, labels)
+        };
+
+        loss += seq_lens.len() as f32 * batch_perf.loss;
+        acc += seq_lens.len() as f32 * batch_perf.accuracy;
+        instances += seq_lens.len();
+
+        progress.inc(1);
+    }
+
+    loss /= instances as f32;
+    acc /= instances as f32;
+
+    (loss, acc)
+}
+
+fn collect_tensors<P>(config: &Config, path: P) -> CollectedTensors
+where
+    P: AsRef<Path>,
+{
+    let labels = load_labels(&config).or_exit(
+        format!(
+            "Cannot load or create label file '{}'",
+            config.labeler.labels
+        ),
+        1,
+    );
+
+    let embeddings = config
+        .embeddings
+        .load_embeddings()
+        .or_exit("Cannot load embeddings", 1);
+    let vectorizer = SentVectorizer::new(embeddings);
+
+    let input_file = File::open(path.as_ref()).or_exit(
+        format!(
+            "Cannot open '{}' for reading",
+            path.as_ref().to_string_lossy()
+        ),
+        1,
+    );
+    let reader = conllx::Reader::new(BufReader::new(
+        FileProgress::new(input_file).or_exit("Cannot create file progress bar", 1),
+    ));
+
+    let mut collector = TensorCollector::new(config.model.batch_size, labels, vectorizer);
     for sentence in reader.sentences() {
         let sentence = sentence.or_exit("Cannot parse sentence", 1);
         collector
@@ -89,14 +212,11 @@ fn main() {
             .or_exit("Cannot collect sentence", 1);
     }
 
-    write_labels(&config, collector.labels()).or_exit("Cannot write labels", 1);
+    collector.into_parts()
 }
 
-fn load_labels_or_new(config: &Config) -> Result<Numberer<String>, Error> {
+fn load_labels(config: &Config) -> Result<Numberer<String>, Error> {
     let labels_path = Path::new(&config.labeler.labels);
-    if !labels_path.exists() {
-        return Ok(Numberer::new(1));
-    }
 
     eprintln!("Loading labels from: {:?}", labels_path);
 
@@ -104,15 +224,4 @@ fn load_labels_or_new(config: &Config) -> Result<Numberer<String>, Error> {
     let system = Numberer::from_cbor_read(f)?;
 
     Ok(system)
-}
-
-fn write_labels(config: &Config, labels: &Numberer<String>) -> Result<(), Error> {
-    let labels_path = Path::new(&config.labeler.labels);
-    if labels_path.exists() {
-        return Ok(());
-    }
-
-    let mut f = File::create(labels_path)?;
-    labels.to_cbor_write(&mut f)?;
-    Ok(())
 }

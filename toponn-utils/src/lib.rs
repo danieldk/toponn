@@ -3,6 +3,10 @@ extern crate conllx;
 #[macro_use]
 extern crate failure;
 
+extern crate indicatif;
+
+extern crate ordered_float;
+
 extern crate tf_embed;
 
 extern crate toponn;
@@ -18,6 +22,9 @@ extern crate toml;
 
 mod config;
 pub use config::{Config, Embedding, Embeddings, Labeler};
+
+mod progress;
+pub use progress::FileProgress;
 
 mod serialization;
 pub use serialization::{CborRead, CborWrite, TomlRead};

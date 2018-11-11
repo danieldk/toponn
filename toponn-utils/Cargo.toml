@@ -7,11 +7,13 @@ authors = ["Daniël de Kok <me@danieldk.eu>"]
 conllx = "0.10"
 failure = "0.1"
 getopts = "0.2"
-serde = "0.9"
-serde_cbor = "0.5"
-serde_derive = "0.9"
+indicatif = "0.9"
+ordered-float = { version = "1", features = ["serde"] }
+serde = "1"
+serde_cbor = "0.9"
+serde_derive = "1"
 stdinout = "0.4"
-toml = "0.3"
+toml = "0.4"
 tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.4.0" }
 toponn = { path = "../toponn" }
 

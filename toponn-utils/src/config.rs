@@ -3,10 +3,11 @@ use std::io::BufReader;
 use std::path::Path;
 
 use failure::Error;
+use ordered_float::NotNan;
 use tf_embed;
 use tf_embed::ReadWord2Vec;
 
-use toponn::tensorflow::Model;
+use toponn::tensorflow::{ExponentialDecay, Model};
 use toponn::LayerEmbeddings;
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -14,6 +15,7 @@ pub struct Config {
     pub labeler: Labeler,
     pub embeddings: Embeddings,
     pub model: Model,
+    pub train: Train,
 }
 
 impl Config {
@@ -28,7 +30,7 @@ impl Config {
         self.embeddings.word.filename =
             relativize_path(config_path, &self.embeddings.word.filename)?;
         self.embeddings.tag.filename = relativize_path(config_path, &self.embeddings.tag.filename)?;
-        self.model.filename = relativize_path(config_path, &self.model.filename)?;
+        self.model.graph = relativize_path(config_path, &self.model.graph)?;
 
         Ok(())
     }
@@ -98,4 +100,24 @@ fn relativize_path(config_path: &Path, filename: &str) -> Result<String, Error> 
             "Cannot cannot convert partent path to string: {}",
             abs_config_path.to_string_lossy()
         ))?.to_owned())
+}
+
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct Train {
+    pub initial_lr: NotNan<f32>,
+    pub decay_rate: NotNan<f32>,
+    pub decay_steps: usize,
+    pub staircase: bool,
+    pub patience: usize,
+}
+
+impl Train {
+    pub fn lr_schedule(&self) -> ExponentialDecay {
+        ExponentialDecay::new(
+            self.initial_lr.into_inner(),
+            self.decay_rate.into_inner(),
+            self.decay_steps,
+            self.staircase,
+        )
+    }
 }

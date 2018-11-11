@@ -168,7 +168,7 @@ class TopoModel:
         self._accuracy = tf.reduce_mean(correct, name="accuracy")
 
         lr = tf.placeholder(tf.float32, [], "lr")
-        self._train_op = tf.train.AdamOptimizer(lr).minimize(loss)
+        self._train_op = tf.train.AdamOptimizer(lr).minimize(loss, name = "train")
 
     @property
     def accuracy(self):

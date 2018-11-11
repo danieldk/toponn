@@ -2,13 +2,11 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use serde::{Deserialize, Serialize};
-
 /// Numberer for categorical values, such as features or class labels.
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
 pub struct Numberer<T>
 where
-    T: Eq + Hash + Serialize + Deserialize,
+    T: Eq + Hash,
 {
     values: Vec<T>,
     numbers: HashMap<T, usize>,
@@ -17,7 +15,7 @@ where
 
 impl<T> Numberer<T>
 where
-    T: Clone + Eq + Hash + Serialize + Deserialize,
+    T: Clone + Eq + Hash,
 {
     pub fn new(start_at: usize) -> Self {
         Numberer {

@@ -1,8 +1,9 @@
 use std::cmp::min;
 use std::io::Read;
+use std::path::Path;
 
 use conllx::Sentence;
-use failure::Error;
+use failure::{err_msg, Error};
 use protobuf::Message;
 use tf::{
     Graph, ImportGraphDefOptions, Operation, Session, SessionOptions, SessionRunArgs, Status,
@@ -11,7 +12,7 @@ use tf::{
 
 use super::tensor::TensorBuilder;
 use tf_proto::ConfigProto;
-use {Numberer, SentVectorizer, Tag};
+use {ModelPerformance, Numberer, SentVectorizer, Tag};
 
 const INITIAL_SEQUENCE_LENGTH: usize = 100;
 
@@ -21,8 +22,8 @@ pub struct Model {
     /// prediction.
     pub batch_size: usize,
 
-    /// The filename of the frozen Tensorflow graph.
-    pub filename: String,
+    /// The filename of the Tensorflow graph.
+    pub graph: String,
 
     /// Operation names for the frozen tensorflow graph.
     pub op_names: OpNames,
@@ -38,6 +39,15 @@ pub struct Model {
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OpNames {
+    pub init_op: String,
+
+    pub restore_op: String,
+    pub save_op: String,
+    pub save_path_op: String,
+
+    pub is_training_op: String,
+    pub lr_op: String,
+
     pub token_embeds_op: String,
     pub tag_embeds_op: String,
 
@@ -45,7 +55,12 @@ pub struct OpNames {
     pub tags_op: String,
     pub seq_lens_op: String,
 
+    pub loss_op: String,
+    pub accuracy_op: String,
+    pub labels_op: String,
     pub predicted_op: String,
+
+    pub train_op: String,
 }
 
 pub struct Tagger {
@@ -55,17 +70,50 @@ pub struct Tagger {
     labels: Numberer<String>,
     builder: TensorBuilder,
 
+    init_op: Operation,
+    restore_op: Operation,
+    save_op: Operation,
+    save_path_op: Operation,
+    lr_op: Operation,
+    is_training_op: Operation,
     token_embeds_op: Operation,
     tokens_op: Operation,
     tags_op: Operation,
     seq_lens_op: Operation,
     tag_embeds_op: Operation,
 
+    loss_op: Operation,
+    accuracy_op: Operation,
+    labels_op: Operation,
     predicted_op: Operation,
+
+    train_op: Operation,
 }
 
 impl Tagger {
     pub fn load_graph<R>(
+        r: R,
+        vectorizer: SentVectorizer,
+        labels: Numberer<String>,
+        model: &Model,
+    ) -> Result<Self, Error>
+    where
+        R: Read,
+    {
+        let mut tagger = Self::load_graph_(r, vectorizer, labels, model)?;
+
+        // Initialize parameters.
+        let mut args = SessionRunArgs::new();
+        args.add_target(&tagger.init_op);
+        tagger
+            .session
+            .run(&mut args)
+            .expect("Cannot initialize parameters");
+
+        Ok(tagger)
+    }
+
+    fn load_graph_<R>(
         mut r: R,
         vectorizer: SentVectorizer,
         labels: Numberer<String>,
@@ -91,6 +139,14 @@ impl Tagger {
 
         let op_names = &model.op_names;
 
+        let restore_op = Self::add_op(&graph, &op_names.restore_op)?;
+        let save_op = Self::add_op(&graph, &op_names.save_op)?;
+        let save_path_op = Self::add_op(&graph, &op_names.save_path_op)?;
+        let init_op = Self::add_op(&graph, &op_names.init_op)?;
+
+        let is_training_op = Self::add_op(&graph, &op_names.is_training_op)?;
+        let lr_op = Self::add_op(&graph, &op_names.lr_op)?;
+
         let token_embeds_op = Self::add_op(&graph, &op_names.token_embeds_op)?;
         let tag_embeds_op = Self::add_op(&graph, &op_names.tag_embeds_op)?;
 
@@ -98,7 +154,12 @@ impl Tagger {
         let tags_op = Self::add_op(&graph, &op_names.tags_op)?;
         let seq_lens_op = Self::add_op(&graph, &op_names.seq_lens_op)?;
 
+        let loss_op = Self::add_op(&graph, &op_names.loss_op)?;
+        let accuracy_op = Self::add_op(&graph, &op_names.accuracy_op)?;
+        let labels_op = Self::add_op(&graph, &op_names.labels_op)?;
         let predicted_op = Self::add_op(&graph, &op_names.predicted_op)?;
+
+        let train_op = Self::add_op(&graph, &op_names.train_op)?;
 
         Ok(Tagger {
             session,
@@ -107,12 +168,24 @@ impl Tagger {
             labels,
             builder: TensorBuilder::new(model.batch_size, INITIAL_SEQUENCE_LENGTH),
 
+            init_op,
+            restore_op,
+            save_op,
+            save_path_op,
+            is_training_op,
+            lr_op,
             tokens_op,
             tags_op,
             seq_lens_op,
             token_embeds_op,
             tag_embeds_op,
+
+            loss_op,
+            accuracy_op,
+            labels_op,
             predicted_op,
+
+            train_op,
         })
     }
 
@@ -130,25 +203,114 @@ impl Tagger {
         self.builder = TensorBuilder::new(self.builder.batch_size(), len);
     }
 
+    /// Save the model parameters.
+    ///
+    /// The model parameters are stored as the given path.
+    pub fn save<P>(&mut self, path: P) -> Result<(), Error>
+    where
+        P: AsRef<Path>,
+    {
+        // Add leading directory component if absent.
+        let path_tensor = prepare_path(path)?.into();
+
+        // Call the save op.
+        let mut args = SessionRunArgs::new();
+        args.add_feed(&self.save_path_op, 0, &path_tensor);
+        args.add_target(&self.save_op);
+        self.session.run(&mut args).map_err(status_to_error)
+    }
+
     fn tag_sequences(&mut self) -> Result<Tensor<i32>, Error> {
-        let mut run_args = SessionRunArgs::new();
+        let mut args = SessionRunArgs::new();
 
         let embeds = self.vectorizer.layer_embeddings();
 
         // Embedding inputs
-        run_args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
-        run_args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
+        args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
+        args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
 
         // Sequence inputs
-        run_args.add_feed(&self.seq_lens_op, 0, self.builder.seq_lens());
-        run_args.add_feed(&self.tokens_op, 0, self.builder.tokens());
-        run_args.add_feed(&self.tags_op, 0, self.builder.tags());
+        args.add_feed(&self.seq_lens_op, 0, self.builder.seq_lens());
+        args.add_feed(&self.tokens_op, 0, self.builder.tokens());
+        args.add_feed(&self.tags_op, 0, self.builder.tags());
 
-        let predictions_token = run_args.request_fetch(&self.predicted_op, 0);
+        let predictions_token = args.request_fetch(&self.predicted_op, 0);
 
-        self.session.run(&mut run_args).map_err(status_to_error)?;
+        self.session.run(&mut args).map_err(status_to_error)?;
 
-        Ok(run_args.fetch(predictions_token).map_err(status_to_error)?)
+        Ok(args.fetch(predictions_token).map_err(status_to_error)?)
+    }
+
+    pub fn validate(
+        &mut self,
+        seq_lens: &Tensor<i32>,
+        tokens: &Tensor<i32>,
+        tags: &Tensor<i32>,
+        labels: &Tensor<i32>,
+    ) -> ModelPerformance {
+        let mut is_training = Tensor::new(&[]);
+        is_training[0] = true;
+
+        let mut args = SessionRunArgs::new();
+        args.add_feed(&self.is_training_op, 0, &is_training);
+
+        self.validate_(seq_lens, tokens, tags, labels, args)
+    }
+
+    pub fn train(
+        &mut self,
+        seq_lens: &Tensor<i32>,
+        tokens: &Tensor<i32>,
+        tags: &Tensor<i32>,
+        labels: &Tensor<i32>,
+        learning_rate: f32,
+    ) -> ModelPerformance {
+        let mut is_training = Tensor::new(&[]);
+        is_training[0] = true;
+
+        let mut lr = Tensor::new(&[]);
+        lr[0] = learning_rate;
+
+        let mut args = SessionRunArgs::new();
+        args.add_feed(&self.is_training_op, 0, &is_training);
+        args.add_feed(&self.lr_op, 0, &lr);
+        args.add_target(&self.train_op);
+
+        self.validate_(seq_lens, tokens, tags, labels, args)
+    }
+
+    fn validate_<'l>(
+        &'l mut self,
+        seq_lens: &'l Tensor<i32>,
+        tokens: &'l Tensor<i32>,
+        tags: &'l Tensor<i32>,
+        labels: &'l Tensor<i32>,
+        mut args: SessionRunArgs<'l>,
+    ) -> ModelPerformance {
+        // Embedding matrices
+        let embeds = self.vectorizer.layer_embeddings();
+        args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
+        args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
+
+        // Add inputs.
+        args.add_feed(&self.tokens_op, 0, tokens);
+        args.add_feed(&self.tags_op, 0, tags);
+        args.add_feed(&self.seq_lens_op, 0, seq_lens);
+
+        // Add gold labels.
+        args.add_feed(&self.labels_op, 0, labels);
+
+        let accuracy_token = args.request_fetch(&self.accuracy_op, 0);
+        let loss_token = args.request_fetch(&self.loss_op, 0);
+
+        self.session.run(&mut args).expect("Cannot run graph");
+
+        ModelPerformance {
+            loss: args.fetch(loss_token).expect("Unable to retrieve loss")[0],
+            accuracy: args
+                .fetch(accuracy_token)
+                .expect("Unable to retrieve accuracy")[0],
+        }
     }
 }
 
@@ -205,6 +367,23 @@ fn tf_model_to_protobuf(model: &Model) -> Result<Vec<u8>, Error> {
     config_proto.write_to_vec(&mut bytes)?;
 
     Ok(bytes)
+}
+
+/// Tensorflow requires a path that contains a directory component.
+fn prepare_path<P>(path: P) -> Result<String, Error>
+where
+    P: AsRef<Path>,
+{
+    let path = path.as_ref();
+    let path = if path.components().count() == 1 {
+        Path::new("./").join(path)
+    } else {
+        path.to_owned()
+    };
+
+    path.to_str()
+        .ok_or(err_msg("Filename contains non-unicode characters"))
+        .map(ToOwned::to_owned)
 }
 
 /// tensorflow::Status is not Sync, which is required by failure.
