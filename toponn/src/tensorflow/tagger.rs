@@ -3,7 +3,9 @@ use std::io::Read;
 
 use conllx::Sentence;
 use protobuf::Message;
-use tf::{Graph, ImportGraphDefOptions, Operation, Session, SessionOptions, StepWithGraph, Tensor};
+use tf::{
+    Graph, ImportGraphDefOptions, Operation, Session, SessionOptions, SessionRunArgs, Tensor,
+};
 
 use super::tensor::TensorBuilder;
 use tf_proto::ConfigProto;
@@ -117,24 +119,24 @@ impl Tagger {
     }
 
     fn tag_sequences(&mut self) -> Result<Tensor<i32>> {
-        let mut step = StepWithGraph::new();
+        let mut run_args = SessionRunArgs::new();
 
         let embeds = self.vectorizer.layer_embeddings();
 
         // Embedding inputs
-        step.add_input(&self.token_embeds_op, 0, embeds.token_embeddings().data());
-        step.add_input(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
+        run_args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
+        run_args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
 
         // Sequence inputs
-        step.add_input(&self.seq_lens_op, 0, self.builder.seq_lens());
-        step.add_input(&self.tokens_op, 0, self.builder.tokens());
-        step.add_input(&self.tags_op, 0, self.builder.tags());
+        run_args.add_feed(&self.seq_lens_op, 0, self.builder.seq_lens());
+        run_args.add_feed(&self.tokens_op, 0, self.builder.tokens());
+        run_args.add_feed(&self.tags_op, 0, self.builder.tags());
 
-        let predictions_token = step.request_output(&self.predicted_op, 0);
+        let predictions_token = run_args.request_fetch(&self.predicted_op, 0);
 
-        self.session.run(&mut step)?;
+        self.session.run(&mut run_args)?;
 
-        Ok(step.take_output(predictions_token)?)
+        Ok(run_args.fetch(predictions_token)?)
     }
 }
 
