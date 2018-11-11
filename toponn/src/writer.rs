@@ -122,7 +122,8 @@ impl HDF5Writer {
     }
 
     fn write_batch(&mut self) -> Result<()> {
-        let time_steps: usize = self.tokens
+        let time_steps: usize = self
+            .tokens
             .iter()
             .map(Vec::len)
             .max()

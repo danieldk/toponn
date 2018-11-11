@@ -1,10 +1,10 @@
 use std::io;
 
 use conllx;
-use tf_embed;
-use toponn;
 use serde_cbor;
+use tf_embed;
 use toml;
+use toponn;
 
 error_chain! {
     foreign_links {

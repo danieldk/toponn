@@ -39,13 +39,14 @@ macro_rules! cbor_read {
             type Value = $type;
 
             fn from_cbor_read<R>(read: R) -> Result<$type>
-                where R: Read
+            where
+                R: Read,
             {
                 let system = serde_cbor::from_reader(read)?;
                 Ok(system)
             }
         }
-    }
+    };
 }
 
 cbor_read!(Numberer<String>);
@@ -74,14 +75,15 @@ macro_rules! cbor_write {
     ($type: ty) => {
         impl CborWrite for $type {
             fn to_cbor_write<W>(&self, write: &mut W) -> Result<()>
-                where W: Write
+            where
+                W: Write,
             {
                 let data = serde_cbor::to_vec(self)?;
                 write.write(&data)?;
                 Ok(())
             }
         }
-    }
+    };
 }
 
 cbor_write!(Numberer<String>);

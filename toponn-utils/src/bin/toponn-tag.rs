@@ -19,8 +19,8 @@ use conllx::{Features, ReadSentence, Sentence, WriteSentence};
 use getopts::Options;
 use stdinout::{Input, OrExit, Output};
 
-use toponn::{Numberer, SentVectorizer, Tag};
 use toponn::tensorflow::Tagger;
+use toponn::{Numberer, SentVectorizer, Tag};
 use toponn_utils::{CborRead, Config, Result, TomlRead};
 
 fn print_usage(program: &str, opts: Options) {

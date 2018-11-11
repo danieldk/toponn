@@ -5,9 +5,9 @@ use conllx::Sentence;
 use protobuf::Message;
 use tf::{Graph, ImportGraphDefOptions, Operation, Session, SessionOptions, StepWithGraph, Tensor};
 
-use {ErrorKind, Numberer, Result, SentVectorizer, Tag};
 use super::tensor::TensorBuilder;
 use tf_proto::ConfigProto;
+use {ErrorKind, Numberer, Result, SentVectorizer, Tag};
 
 const INITIAL_SEQUENCE_LENGTH: usize = 100;
 

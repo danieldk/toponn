@@ -75,7 +75,7 @@ fn main() {
         .or_exit("Cannot write embeddings", 1);
 }
 
-fn vec_add(sum_embed: &mut[f32], embed: &[f32]) {
+fn vec_add(sum_embed: &mut [f32], embed: &[f32]) {
     assert_eq!(embed.len(), sum_embed.len());
 
     for idx in 0..embed.len() {
