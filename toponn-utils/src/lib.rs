@@ -1,7 +1,7 @@
 extern crate conllx;
 
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 
 extern crate tf_embed;
 
@@ -18,9 +18,6 @@ extern crate toml;
 
 mod config;
 pub use config::{Config, Embedding, Embeddings, Labeler};
-
-mod error;
-pub use error::*;
 
 mod serialization;
 pub use serialization::{CborRead, CborWrite, TomlRead};

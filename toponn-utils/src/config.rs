@@ -2,13 +2,12 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
+use failure::Error;
 use tf_embed;
 use tf_embed::ReadWord2Vec;
 
 use toponn::tensorflow::Model;
 use toponn::LayerEmbeddings;
-
-use {ErrorKind, Result};
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Config {
@@ -19,7 +18,7 @@ pub struct Config {
 
 impl Config {
     /// Make configuration paths relative to the configuration file.
-    pub fn relativize_paths<P>(&mut self, config_path: P) -> Result<()>
+    pub fn relativize_paths<P>(&mut self, config_path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {
@@ -48,14 +47,17 @@ pub struct Embedding {
 }
 
 impl Embeddings {
-    pub fn load_embeddings(&self) -> Result<LayerEmbeddings> {
+    pub fn load_embeddings(&self) -> Result<LayerEmbeddings, Error> {
         let token_embeddings = self.load_layer_embeddings(&self.word)?;
         let tag_embeddings = self.load_layer_embeddings(&self.tag)?;
 
         Ok(LayerEmbeddings::new(token_embeddings, tag_embeddings))
     }
 
-    pub fn load_layer_embeddings(&self, embeddings: &Embedding) -> Result<tf_embed::Embeddings> {
+    pub fn load_layer_embeddings(
+        &self,
+        embeddings: &Embedding,
+    ) -> Result<tf_embed::Embeddings, Error> {
         let f = File::open(&embeddings.filename)?;
         let mut embeds = tf_embed::Embeddings::read_word2vec_binary(&mut BufReader::new(f))?;
 
@@ -72,7 +74,7 @@ pub struct Labeler {
     pub labels: String,
 }
 
-fn relativize_path(config_path: &Path, filename: &str) -> Result<String> {
+fn relativize_path(config_path: &Path, filename: &str) -> Result<String, Error> {
     if filename.is_empty() {
         return Ok(filename.to_owned());
     }
@@ -87,11 +89,13 @@ fn relativize_path(config_path: &Path, filename: &str) -> Result<String> {
     let abs_config_path = config_path.canonicalize()?;
     Ok(abs_config_path
         .parent()
-        .ok_or(ErrorKind::ConfigError(String::from(
-            "Cannot get the parent path of the configuration file",
-        )))?.join(path)
+        .ok_or(format_err!(
+            "Cannot get parent path of the configuration file: {}",
+            abs_config_path.to_string_lossy()
+        ))?.join(path)
         .to_str()
-        .ok_or(ErrorKind::ConfigError(String::from(
-            "Cannot convert path to string",
-        )))?.to_owned())
+        .ok_or(format_err!(
+            "Cannot cannot convert partent path to string: {}",
+            abs_config_path.to_string_lossy()
+        ))?.to_owned())
 }

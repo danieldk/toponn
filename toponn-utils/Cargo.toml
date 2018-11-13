@@ -4,15 +4,15 @@ version = "0.1.0"
 authors = ["Daniël de Kok <me@danieldk.eu>"]
 
 [dependencies]
-conllx = "0.9"
-error-chain = "0.11"
+conllx = "0.10"
+failure = "0.1"
 getopts = "0.2"
 serde = "0.9"
 serde_cbor = "0.5"
 serde_derive = "0.9"
 stdinout = "0.4"
 toml = "0.3"
-tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.1.0" }
+tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.4.0" }
 toponn = { path = "../toponn" }
 
 [dev-dependencies]

@@ -1,7 +1,7 @@
 extern crate conllx;
 
 #[macro_use]
-extern crate error_chain;
+extern crate failure;
 
 extern crate hdf5;
 
@@ -19,9 +19,6 @@ extern crate tensorflow as tf;
 extern crate tf_embed;
 
 extern crate tf_proto;
-
-mod error;
-pub use error::*;
 
 mod input;
 pub use input::{LayerEmbeddings, SentVec, SentVectorizer};

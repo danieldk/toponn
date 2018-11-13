@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use conllx::Sentence;
 use tf_embed::Embeddings;
 
-use {ErrorKind, Result};
+use failure::Error;
 
 /// Sentence represented as a vector.
 ///
@@ -94,14 +94,12 @@ impl SentVectorizer {
     }
 
     /// Vectorize a sentence.
-    pub fn realize(&self, sentence: &Sentence) -> Result<SentVec> {
-        let mut input = SentVec::with_capacity(sentence.as_tokens().len());
+    pub fn realize(&self, sentence: &Sentence) -> Result<SentVec, Error> {
+        let mut input = SentVec::with_capacity(sentence.len());
 
         for token in sentence {
             let form = token.form();
-            let pos = token
-                .pos()
-                .ok_or(ErrorKind::MissingPOSTag(format!("{}", token)))?;
+            let pos = token.pos().ok_or(format_err!("{}", token))?;
 
             input.tokens.push(lookup_value_or_unknown(
                 self.layer_embeddings.token_embeddings.indices(),

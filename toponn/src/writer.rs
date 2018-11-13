@@ -2,15 +2,16 @@ use std::cmp::min;
 use std::path::Path;
 
 use conllx::Sentence;
+use failure::Error;
 use hdf5;
 use hdf5::IntoData;
 use itertools::multizip;
 
-use {ErrorKind, Numberer, Result, SentVec, SentVectorizer};
+use {Numberer, SentVec, SentVectorizer};
 
 /// Data types collects (and typically stores) vectorized sentences.
 pub trait Collector {
-    fn collect(&mut self, sentence: &Sentence) -> Result<()>;
+    fn collect(&mut self, sentence: &Sentence) -> Result<(), Error>;
 }
 
 /// Collector that stores vectorized sentences in a HDF5 container.
@@ -26,7 +27,7 @@ impl HDF5Collector {
         numberer: Numberer<String>,
         vectorizer: SentVectorizer,
         batch_size: usize,
-    ) -> Result<Self>
+    ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -43,21 +44,25 @@ impl HDF5Collector {
 }
 
 impl Collector for HDF5Collector {
-    fn collect(&mut self, sentence: &Sentence) -> Result<()> {
+    fn collect(&mut self, sentence: &Sentence) -> Result<(), Error> {
         let input = self.vectorizer.realize(sentence)?;
 
-        let mut labels = Vec::with_capacity(sentence.as_tokens().len());
+        let mut labels = Vec::with_capacity(sentence.len());
         for token in sentence {
             let features = token
                 .features()
-                .ok_or(ErrorKind::MissingTopologicalField(format!("{}", token)))?
-                .as_map();
-            let opt_tf = features
-                .get("tf")
-                .ok_or(ErrorKind::MissingTopologicalField(format!("{}", token)))?;
-            let tf = opt_tf
-                .clone()
-                .ok_or(ErrorKind::MissingTopologicalField(format!("{}", token)))?;
+                .ok_or(format_err!(
+                    "No features field with a topological field (tf) feature: {}",
+                    token
+                ))?.as_map();
+            let opt_tf = features.get("tf").ok_or(format_err!(
+                "No features field with a topological field (tf) feature: {}",
+                token
+            ))?;
+            let tf = opt_tf.clone().ok_or(format_err!(
+                "Topological field feature (tf) without a value: {}",
+                token
+            ))?;
 
             labels.push(self.numberer.add(tf.to_owned()));
         }
@@ -93,7 +98,7 @@ impl HDF5Writer {
         }
     }
 
-    pub fn write(&mut self, labels: &[usize], input: SentVec) -> Result<()> {
+    pub fn write(&mut self, labels: &[usize], input: SentVec) -> Result<(), Error> {
         let (tokens, tags) = input.to_parts();
 
         self.tags.push(tags);
@@ -121,7 +126,7 @@ impl HDF5Writer {
         self.lens.clear();
     }
 
-    fn write_batch(&mut self) -> Result<()> {
+    fn write_batch(&mut self) -> Result<(), Error> {
         let time_steps: usize = self
             .tokens
             .iter()
@@ -161,7 +166,7 @@ impl HDF5Writer {
         Ok(())
     }
 
-    fn write_batch_raw(&self, layer: &str, data: &[i32]) -> Result<()> {
+    fn write_batch_raw(&self, layer: &str, data: &[i32]) -> Result<(), Error> {
         let mut writer = hdf5::Writer::new(
             &self.file,
             &format!("batch{}-{}", self.batch, layer),

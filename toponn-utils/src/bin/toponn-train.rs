@@ -1,5 +1,7 @@
 extern crate conllx;
 
+extern crate failure;
+
 extern crate getopts;
 
 extern crate stdinout;
@@ -15,11 +17,12 @@ use std::path::Path;
 use std::process;
 
 use conllx::ReadSentence;
+use failure::Error;
 use getopts::Options;
 use stdinout::OrExit;
 
 use toponn::{Collector, HDF5Collector, Numberer, SentVectorizer};
-use toponn_utils::{CborRead, CborWrite, Config, Result, TomlRead};
+use toponn_utils::{CborRead, CborWrite, Config, TomlRead};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options] CONFIG DATA OUTPUT.HDF5", program);
@@ -89,7 +92,7 @@ fn main() {
     write_labels(&config, collector.labels()).or_exit("Cannot write labels", 1);
 }
 
-fn load_labels_or_new(config: &Config) -> Result<Numberer<String>> {
+fn load_labels_or_new(config: &Config) -> Result<Numberer<String>, Error> {
     let labels_path = Path::new(&config.labeler.labels);
     if !labels_path.exists() {
         return Ok(Numberer::new(1));
@@ -103,7 +106,7 @@ fn load_labels_or_new(config: &Config) -> Result<Numberer<String>> {
     Ok(system)
 }
 
-fn write_labels(config: &Config, labels: &Numberer<String>) -> Result<()> {
+fn write_labels(config: &Config, labels: &Numberer<String>) -> Result<(), Error> {
     let labels_path = Path::new(&config.labeler.labels);
     if labels_path.exists() {
         return Ok(());

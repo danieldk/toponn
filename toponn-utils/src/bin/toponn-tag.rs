@@ -1,5 +1,7 @@
 extern crate conllx;
 
+extern crate failure;
+
 extern crate getopts;
 
 extern crate stdinout;
@@ -16,12 +18,13 @@ use std::path::Path;
 use std::process;
 
 use conllx::{Features, ReadSentence, Sentence, WriteSentence};
+use failure::Error;
 use getopts::Options;
 use stdinout::{Input, OrExit, Output};
 
 use toponn::tensorflow::Tagger;
 use toponn::{Numberer, SentVectorizer, Tag};
-use toponn_utils::{CborRead, Config, Result, TomlRead};
+use toponn_utils::{CborRead, Config, TomlRead};
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options] CONFIG [INPUT] [OUTPUT]", program);
@@ -122,7 +125,7 @@ where
         }
     }
 
-    pub fn process(&mut self, sent: Sentence) -> Result<()> {
+    pub fn process(&mut self, sent: Sentence) -> Result<(), Error> {
         self.batch_sents.push(sent);
 
         if self.batch_sents.len() == self.batch_size {
@@ -134,14 +137,12 @@ where
         Ok(())
     }
 
-    fn write_sent_labels(&mut self, labels: Vec<Vec<String>>) -> Result<()>
+    fn write_sent_labels(&mut self, labels: Vec<Vec<String>>) -> Result<(), Error>
     where
         W: Write,
     {
-        for (sentence, sent_labels) in self.batch_sents.iter_mut().zip(labels.iter()) {
+        for (tokens, sent_labels) in self.batch_sents.iter_mut().zip(labels.iter()) {
             {
-                let mut tokens = sentence.as_tokens_mut();
-
                 for i in 0..tokens.len() {
                     // Obtain the feature mapping or construct a fresh one.
                     let mut features = tokens[i]
@@ -157,7 +158,7 @@ where
                 }
             }
 
-            self.writer.write_sentence(&sentence)?;
+            self.writer.write_sentence(tokens)?;
         }
 
         Ok(())
@@ -186,7 +187,7 @@ where
     }
 }
 
-fn load_labels(config: &Config) -> Result<Numberer<String>> {
+fn load_labels(config: &Config) -> Result<Numberer<String>, Error> {
     let labels_path = Path::new(&config.labeler.labels);
 
     eprintln!("Loading labels from: {:?}", labels_path);
