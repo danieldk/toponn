@@ -31,6 +31,7 @@ impl Config {
             relativize_path(config_path, &self.embeddings.word.filename)?;
         self.embeddings.tag.filename = relativize_path(config_path, &self.embeddings.tag.filename)?;
         self.model.graph = relativize_path(config_path, &self.model.graph)?;
+        self.model.parameters = relativize_path(config_path, &self.model.parameters)?;
 
         Ok(())
     }

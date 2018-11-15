@@ -85,8 +85,13 @@ fn main() {
         ),
         1,
     );
-    let tagger = Tagger::load_graph(graph_reader, vectorizer, labels, &config.model)
-        .or_exit("Cannot load computation graph", 1);
+    let tagger = Tagger::load_graph_with_weights(
+        graph_reader,
+        &config.model.parameters,
+        vectorizer,
+        labels,
+        &config.model,
+    ).or_exit("Cannot load computation graph", 1);
 
     let mut sent_proc = SentProcessor::new(tagger, writer, config.model.batch_size);
 

@@ -35,6 +35,9 @@ pub struct Model {
     /// Thread pool size for parallel processing of independent computation
     /// graph ops.
     pub inter_op_parallelism_threads: usize,
+
+    /// The filename of the trained graph parameters.
+    pub parameters: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -111,6 +114,33 @@ impl Tagger {
             .expect("Cannot initialize parameters");
 
         Ok(tagger)
+    }
+
+    /// Load a Tensorflow graph with weights.
+    ///
+    /// This constructor will load the model parameters (such as weights) from
+    /// the file specified in `parameters_path`.
+    pub fn load_graph_with_weights<P, R>(
+        graph_read: R,
+        parameters_path: P,
+        vectorizer: SentVectorizer,
+        labels: Numberer<String>,
+        model: &Model,
+    ) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+        R: Read,
+    {
+        let mut model = Self::load_graph_(graph_read, vectorizer, labels, model)?;
+
+        // Restore parameters.
+        let path_tensor = prepare_path(parameters_path)?.into();
+        let mut args = SessionRunArgs::new();
+        args.add_feed(&model.save_path_op, 0, &path_tensor);
+        args.add_target(&model.restore_op);
+        model.session.run(&mut args).map_err(status_to_error)?;
+
+        Ok(model)
     }
 
     fn load_graph_<R>(
@@ -221,7 +251,12 @@ impl Tagger {
     }
 
     fn tag_sequences(&mut self) -> Result<Tensor<i32>, Error> {
+        let mut is_training = Tensor::new(&[]);
+        is_training[0] = false;
+
         let mut args = SessionRunArgs::new();
+
+        args.add_feed(&self.is_training_op, 0, &is_training);
 
         let embeds = self.vectorizer.layer_embeddings();
 
