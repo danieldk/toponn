@@ -14,8 +14,6 @@ use super::tensor::TensorBuilder;
 use tf_proto::ConfigProto;
 use {ModelPerformance, Numberer, SentVectorizer, Tag};
 
-const INITIAL_SEQUENCE_LENGTH: usize = 100;
-
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Model {
     /// Model batch size, should be kept constant between training and
@@ -71,7 +69,6 @@ pub struct Tagger {
 
     vectorizer: SentVectorizer,
     labels: Numberer<String>,
-    builder: TensorBuilder,
 
     init_op: Operation,
     restore_op: Operation,
@@ -196,7 +193,6 @@ impl Tagger {
 
             vectorizer,
             labels,
-            builder: TensorBuilder::new(model.batch_size, INITIAL_SEQUENCE_LENGTH),
 
             init_op,
             restore_op,
@@ -225,14 +221,6 @@ impl Tagger {
             .map_err(status_to_error)
     }
 
-    fn ensure_builder_seq_len(&mut self, len: usize) {
-        if self.builder.max_seq_len() >= len {
-            return;
-        }
-
-        self.builder = TensorBuilder::new(self.builder.batch_size(), len);
-    }
-
     /// Save the model parameters.
     ///
     /// The model parameters are stored as the given path.
@@ -250,7 +238,12 @@ impl Tagger {
         self.session.run(&mut args).map_err(status_to_error)
     }
 
-    fn tag_sequences(&mut self) -> Result<Tensor<i32>, Error> {
+    fn tag_sequences(
+        &mut self,
+        seq_lens: &Tensor<i32>,
+        tokens: &Tensor<i32>,
+        tags: &Tensor<i32>,
+    ) -> Result<Tensor<i32>, Error> {
         let mut is_training = Tensor::new(&[]);
         is_training[0] = false;
 
@@ -265,9 +258,9 @@ impl Tagger {
         args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
 
         // Sequence inputs
-        args.add_feed(&self.seq_lens_op, 0, self.builder.seq_lens());
-        args.add_feed(&self.tokens_op, 0, self.builder.tokens());
-        args.add_feed(&self.tags_op, 0, self.builder.tags());
+        args.add_feed(&self.seq_lens_op, 0, seq_lens);
+        args.add_feed(&self.tokens_op, 0, tokens);
+        args.add_feed(&self.tags_op, 0, tags);
 
         let predictions_token = args.request_fetch(&self.predicted_op, 0);
 
@@ -351,28 +344,20 @@ impl Tagger {
 
 impl Tag for Tagger {
     fn tag_sentences(&mut self, sentences: &[Sentence]) -> Result<Vec<Vec<&str>>, Error> {
-        if sentences.len() > self.builder.batch_size() {
-            return Err(format_err!(
-                "Incorrect batch size: {}, expected: {}",
-                sentences.len(),
-                self.builder.batch_size()
-            ));
-        }
-
         // Find maximum sentence size.
         let max_seq_len = sentences.iter().map(|s| s.len()).max().unwrap_or(0);
-        self.ensure_builder_seq_len(max_seq_len);
 
-        self.builder.clear();
+        let mut builder = TensorBuilder::new(sentences.len(), max_seq_len);
 
         // Fill the batch.
         for sentence in sentences {
             let input = self.vectorizer.realize(sentence)?;
-            self.builder.add(&input);
+            builder.add(&input);
         }
 
         // Tag the batch
-        let tag_tensor = self.tag_sequences()?;
+        let tag_tensor =
+            self.tag_sequences(builder.seq_lens(), builder.tokens(), builder.tags())?;
 
         // Convert label numbers to labels.
         let numberer = &self.labels;

@@ -41,18 +41,6 @@ impl TensorBuilder {
         self.sequence += 1;
     }
 
-    pub fn batch_size(&self) -> usize {
-        self.tokens.dims()[0] as usize
-    }
-
-    pub fn clear(&mut self) {
-        self.sequence = 0;
-    }
-
-    pub fn max_seq_len(&self) -> usize {
-        self.tokens.dims()[1] as usize
-    }
-
     pub fn seq_lens(&self) -> &Tensor<i32> {
         &self.sequence_lens
     }
