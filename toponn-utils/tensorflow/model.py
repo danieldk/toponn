@@ -115,10 +115,11 @@ class TopoModel:
 
         hidden_states = batch_norm(
             hidden_states,
-            scale=True,
             decay=0.98,
+            scale=True,
+            is_training=self.is_training,
             fused=False,
-            is_training=self.is_training)
+            updates_collections=None)
 
         softmax_w = tf.get_variable(
             "softmax_w", [
