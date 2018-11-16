@@ -277,7 +277,7 @@ impl Tagger {
         labels: &Tensor<i32>,
     ) -> ModelPerformance {
         let mut is_training = Tensor::new(&[]);
-        is_training[0] = true;
+        is_training[0] = false;
 
         let mut args = SessionRunArgs::new();
         args.add_feed(&self.is_training_op, 0, &is_training);
