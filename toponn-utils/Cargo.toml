@@ -14,7 +14,7 @@ serde_cbor = "0.9"
 serde_derive = "1"
 stdinout = "0.4"
 toml = "0.4"
-tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.4.0" }
+tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.5.0" }
 toponn = { path = "../toponn" }
 
 [dev-dependencies]
