@@ -56,12 +56,12 @@ if __name__ == '__main__':
         default=200)
     parser.add_argument(
         "--keep_prob",
-        type=int,
+        type=float,
         help="dropout keep probability",
         default=0.85)
     parser.add_argument(
         "--keep_prob_input",
-        type=int,
+        type=float,
         help="input keep probability",
         default=0.80)
     args = parser.parse_args()
