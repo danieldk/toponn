@@ -162,9 +162,10 @@ fn run_epoch(
             tagger.validate(seq_lens, tokens, tags, labels)
         };
 
-        loss += seq_lens.len() as f32 * batch_perf.loss;
-        acc += seq_lens.len() as f32 * batch_perf.accuracy;
-        instances += seq_lens.len();
+        let n_tokens = seq_lens.iter().sum::<i32>();
+        loss += n_tokens as f32 * batch_perf.loss;
+        acc += n_tokens as f32 * batch_perf.accuracy;
+        instances += n_tokens;
 
         progress.inc(1);
     }
