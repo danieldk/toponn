@@ -125,5 +125,7 @@ fn lookup_value_or_unknown(m: &HashMap<String, usize>, value: &str) -> i32 {
 }
 
 fn lookup_unknown(m: &HashMap<String, usize>) -> i32 {
-    m.get("<UNKNOWN-TOKEN>").cloned().unwrap_or(0) as i32
+    m.get("<UNKNOWN-TOKEN>")
+        .cloned()
+        .expect("No unknown token embedding: <UNKNOWN_TOKEN>") as i32
 }
