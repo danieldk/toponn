@@ -22,9 +22,8 @@ lazy_static! {
         },
         train: Train {
             initial_lr: NotNan::from(0.05),
-            decay_rate: NotNan::from(0.8),
-            decay_steps: 10,
-            staircase: true,
+            lr_scale: NotNan::from(0.5),
+            lr_patience: 4,
             patience: 10,
         },
         model: Model {

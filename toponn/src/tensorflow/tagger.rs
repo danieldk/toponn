@@ -280,6 +280,7 @@ impl Tagger {
         is_training[0] = false;
 
         let mut args = SessionRunArgs::new();
+
         args.add_feed(&self.is_training_op, 0, &is_training);
 
         self.validate_(seq_lens, tokens, tags, labels, args)
@@ -363,8 +364,8 @@ impl Tag for Tagger {
         let numberer = &self.labels;
         let mut labels = Vec::new();
         for (idx, sentence) in sentences.iter().enumerate() {
-            let seq_len = min(tag_tensor.dims()[1] as usize, sentence.len());
-            let offset = idx * tag_tensor.dims()[1] as usize;
+            let seq_len = min(max_seq_len, sentence.len());
+            let offset = idx * max_seq_len;
             let seq = &tag_tensor[offset..offset + seq_len];
 
             labels.push(
