@@ -33,7 +33,5 @@ mod writer;
 pub use writer::{Collector, NoopCollector};
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
-}
+#[macro_use]
+extern crate approx;

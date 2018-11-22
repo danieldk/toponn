@@ -13,3 +13,6 @@ serde_derive = "1"
 tf-embed = { git = "https://github.com/danieldk/tf-embed-rs", tag = "v0.5.0" }
 tf-proto = { git = "https://github.com/danieldk/tf-proto-rs", tag = "v1.4.0" }
 tensorflow = "0.11"
+
+[dev-dependencies]
+approx = "0.3"

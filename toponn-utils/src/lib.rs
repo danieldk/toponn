@@ -21,7 +21,7 @@ extern crate serde_derive;
 extern crate toml;
 
 mod config;
-pub use config::{Config, Embedding, Embeddings, Labeler};
+pub use config::{Config, Embedding, Embeddings, Labeler, Train};
 
 mod progress;
 pub use progress::FileProgress;
