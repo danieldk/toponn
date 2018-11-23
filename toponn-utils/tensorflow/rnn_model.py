@@ -61,7 +61,7 @@ def rnn_layers(
         sequence_length=seq_lens)
 
 
-class TopoModel:
+class RNNModel:
     def __init__(
             self,
             config,
