@@ -9,16 +9,14 @@ The original Go version can be found in the
 Building toponn has the following requirements:
 
 * A reasonably [modern Rust compiler](https://rustup.rs).
-* Tensorflow built as a dynamic library (the Python module is **only** used
-  for training.
-* libhdf5
+* Tensorflow built as a dynamic library (the Python module is **only** to construct/write the graph).
 
 ## macOS
 
 Install the dependencies using Homebrew:
 
 ~~~bash
-$ brew install rustup-init hdf5 libtensorflow
+$ brew install rustup-init libtensorflow
 # Install/configure the Rust toolchain.
 $ rustup-init
 ~~~
@@ -31,3 +29,9 @@ $ cargo install --path toponn-utils
 ~~~
 
 toponn should then be installed in ~/.cargo/bin/toponn-{tag,train,server}
+
+## References
+
+If you use toponn in a scientific publication, please cite:
+
+* Daniël de Kok and Erhard Hinrichs, *Transition-based dependency parsing with topological fields*, Proceedings of ACL 2016, Berlin, Germany
