@@ -11,7 +11,7 @@ Building toponn has the following requirements:
 * A reasonably [modern Rust compiler](https://rustup.rs).
 * Tensorflow built as a dynamic library (the Python module is **only** to construct/write the graph).
 
-## macOS
+### macOS
 
 Install the dependencies using Homebrew:
 
