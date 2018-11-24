@@ -18,6 +18,9 @@ extern crate tf_embed;
 
 extern crate tf_proto;
 
+mod collector;
+pub use collector::{Collector, NoopCollector};
+
 mod input;
 pub use input::{LayerEmbeddings, SentVec, SentVectorizer};
 
@@ -28,9 +31,6 @@ mod tag;
 pub use tag::{ModelPerformance, Tag};
 
 pub mod tensorflow;
-
-mod writer;
-pub use writer::{Collector, NoopCollector};
 
 #[cfg(test)]
 #[macro_use]
