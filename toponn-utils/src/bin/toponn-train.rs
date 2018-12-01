@@ -147,10 +147,10 @@ fn run_epoch(
     let mut loss = 0f32;
 
     let progress = ProgressBar::new(tensors.labels.len() as u64);
-    progress.set_style(
-        ProgressStyle::default_bar()
-            .template(&format!("{{bar}} {} batch {{pos}}/{{len}}", epoch_type)),
-    );
+    progress.set_style(ProgressStyle::default_bar().template(&format!(
+        "{{bar}} {} batch {{pos}}/{{len}}, {{msg}}",
+        epoch_type
+    )));
 
     for i in 0..tensors.labels.len() {
         let seq_lens = &tensors.sequence_lens[i];
@@ -170,6 +170,7 @@ fn run_epoch(
         instances += n_tokens;
 
         progress.inc(1);
+        progress.set_message(&format!("batch loss: {}", batch_perf.loss));
     }
 
     loss /= instances as f32;
