@@ -102,12 +102,12 @@ fn main() {
             .vectorizer()
             .layer_embeddings()
             .token_embeddings()
-            .embed_len(),
+            .dims(),
         tag_embed_dims: collector
             .vectorizer()
             .layer_embeddings()
             .tag_embeddings()
-            .embed_len(),
+            .dims(),
     };
 
     write!(

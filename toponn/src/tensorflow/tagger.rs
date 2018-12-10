@@ -49,9 +49,6 @@ pub struct OpNames {
     pub is_training_op: String,
     pub lr_op: String,
 
-    pub token_embeds_op: String,
-    pub tag_embeds_op: String,
-
     pub tokens_op: String,
     pub tags_op: String,
     pub seq_lens_op: String,
@@ -76,11 +73,9 @@ pub struct Tagger {
     save_path_op: Operation,
     lr_op: Operation,
     is_training_op: Operation,
-    token_embeds_op: Operation,
     tokens_op: Operation,
     tags_op: Operation,
     seq_lens_op: Operation,
-    tag_embeds_op: Operation,
 
     loss_op: Operation,
     accuracy_op: Operation,
@@ -174,9 +169,6 @@ impl Tagger {
         let is_training_op = Self::add_op(&graph, &op_names.is_training_op)?;
         let lr_op = Self::add_op(&graph, &op_names.lr_op)?;
 
-        let token_embeds_op = Self::add_op(&graph, &op_names.token_embeds_op)?;
-        let tag_embeds_op = Self::add_op(&graph, &op_names.tag_embeds_op)?;
-
         let tokens_op = Self::add_op(&graph, &op_names.tokens_op)?;
         let tags_op = Self::add_op(&graph, &op_names.tags_op)?;
         let seq_lens_op = Self::add_op(&graph, &op_names.seq_lens_op)?;
@@ -203,8 +195,6 @@ impl Tagger {
             tokens_op,
             tags_op,
             seq_lens_op,
-            token_embeds_op,
-            tag_embeds_op,
 
             loss_op,
             accuracy_op,
@@ -241,8 +231,8 @@ impl Tagger {
     fn tag_sequences(
         &mut self,
         seq_lens: &Tensor<i32>,
-        tokens: &Tensor<i32>,
-        tags: &Tensor<i32>,
+        tokens: &Tensor<f32>,
+        tags: &Tensor<f32>,
     ) -> Result<Tensor<i32>, Error> {
         let mut is_training = Tensor::new(&[]);
         is_training[0] = false;
@@ -250,12 +240,6 @@ impl Tagger {
         let mut args = SessionRunArgs::new();
 
         args.add_feed(&self.is_training_op, 0, &is_training);
-
-        let embeds = self.vectorizer.layer_embeddings();
-
-        // Embedding inputs
-        args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
-        args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
 
         // Sequence inputs
         args.add_feed(&self.seq_lens_op, 0, seq_lens);
@@ -272,8 +256,8 @@ impl Tagger {
     pub fn validate(
         &mut self,
         seq_lens: &Tensor<i32>,
-        tokens: &Tensor<i32>,
-        tags: &Tensor<i32>,
+        tokens: &Tensor<f32>,
+        tags: &Tensor<f32>,
         labels: &Tensor<i32>,
     ) -> ModelPerformance {
         let mut is_training = Tensor::new(&[]);
@@ -289,8 +273,8 @@ impl Tagger {
     pub fn train(
         &mut self,
         seq_lens: &Tensor<i32>,
-        tokens: &Tensor<i32>,
-        tags: &Tensor<i32>,
+        tokens: &Tensor<f32>,
+        tags: &Tensor<f32>,
         labels: &Tensor<i32>,
         learning_rate: f32,
     ) -> ModelPerformance {
@@ -311,16 +295,11 @@ impl Tagger {
     fn validate_<'l>(
         &'l mut self,
         seq_lens: &'l Tensor<i32>,
-        tokens: &'l Tensor<i32>,
-        tags: &'l Tensor<i32>,
+        tokens: &'l Tensor<f32>,
+        tags: &'l Tensor<f32>,
         labels: &'l Tensor<i32>,
         mut args: SessionRunArgs<'l>,
     ) -> ModelPerformance {
-        // Embedding matrices
-        let embeds = self.vectorizer.layer_embeddings();
-        args.add_feed(&self.token_embeds_op, 0, embeds.token_embeddings().data());
-        args.add_feed(&self.tag_embeds_op, 0, embeds.tag_embeddings().data());
-
         // Add inputs.
         args.add_feed(&self.tokens_op, 0, tokens);
         args.add_feed(&self.tags_op, 0, tags);
@@ -348,7 +327,15 @@ impl Tag for Tagger {
         // Find maximum sentence size.
         let max_seq_len = sentences.iter().map(|s| s.len()).max().unwrap_or(0);
 
-        let mut builder = TensorBuilder::new(sentences.len(), max_seq_len);
+        let (token_dims, tag_dims) = {
+            let embeddings = self.vectorizer.layer_embeddings();
+            (
+                embeddings.token_embeddings().dims(),
+                embeddings.tag_embeddings().dims(),
+            )
+        };
+
+        let mut builder = TensorBuilder::new(sentences.len(), max_seq_len, token_dims, tag_dims);
 
         // Fill the batch.
         for sentence in sentences {

@@ -169,24 +169,18 @@ class ConvModel:
 
         # Inputs: tags and tokens.
         self._tokens = tf.placeholder(
-            tf.int32, [None, None], name="tokens")
-        self._tags = tf.placeholder(tf.int32, [None, None], name="tags")
+            tf.float32, [
+                None, None, shapes['token_embed_dims']], name="tokens")
+        self._tags = tf.placeholder(
+            tf.float32, [
+                None, None, shapes['tag_embed_dims']], name="tags")
 
         # Sequence lenghts
         self._seq_lens = tf.placeholder(
             tf.int32, [None], name="seq_lens")
         input_mask = tf.sequence_mask(self._seq_lens, dtype=tf.float32)
 
-        # Embeddings
-        self._token_embeds = tf.placeholder(
-            tf.float32, [None, shapes['token_embed_dims']], "token_embeds")
-        self._tag_embeds = tf.placeholder(
-            tf.float32, [None, shapes['tag_embed_dims']], "tag_embeds")
-
-        token_embeds = tf.nn.embedding_lookup(self._token_embeds, self._tokens)
-        tag_embeds = tf.nn.embedding_lookup(self._tag_embeds, self._tags)
-
-        inputs = tf.concat([token_embeds, tag_embeds], axis=2)
+        inputs = tf.concat([self._tokens, self._tags], axis=2)
 
         inputs = tf.contrib.layers.dropout(
             inputs,

@@ -91,7 +91,8 @@ fn main() {
         vectorizer,
         labels,
         &config.model,
-    ).or_exit("Cannot load computation graph", 1);
+    )
+    .or_exit("Cannot load computation graph", 1);
 
     let mut sent_proc = SentProcessor::new(tagger, writer, config.model.batch_size);
 

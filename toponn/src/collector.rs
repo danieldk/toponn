@@ -42,7 +42,8 @@ impl Collector for NoopCollector {
                 .ok_or(format_err!(
                     "No features field with a topological field (tf) feature: {}",
                     token
-                ))?.as_map();
+                ))?
+                .as_map();
             let opt_tf = features.get("tf").ok_or(format_err!(
                 "No features field with a topological field (tf) feature: {}",
                 token

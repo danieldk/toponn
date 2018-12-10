@@ -3,11 +3,13 @@ extern crate conllx;
 #[macro_use]
 extern crate failure;
 
+extern crate finalfrontier;
+
 extern crate indicatif;
 
 extern crate ordered_float;
 
-extern crate tf_embed;
+extern crate rust2vec;
 
 extern crate toponn;
 

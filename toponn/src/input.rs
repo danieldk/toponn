@@ -1,18 +1,51 @@
-use std::collections::HashMap;
+use std::borrow::Cow;
 
 use conllx::Sentence;
-use tf_embed::Embeddings;
-
 use failure::Error;
+
+pub enum Embeddings {
+    FinalFrontier(finalfrontier::Model),
+    Word2Vec(rust2vec::Embeddings),
+}
+
+impl Embeddings {
+    pub fn dims(&self) -> usize {
+        match self {
+            Embeddings::FinalFrontier(model) => model.config().dims as usize,
+            Embeddings::Word2Vec(embeds) => embeds.embed_len(),
+        }
+    }
+
+    pub fn embedding(&self, word: &str) -> Cow<[f32]> {
+        let embed = match self {
+            Embeddings::FinalFrontier(model) => Cow::Owned(
+                model
+                    .embedding(word)
+                    .expect("Cannot retrieve embedding.")
+                    .into_raw_vec(),
+            ),
+            Embeddings::Word2Vec(embeds) => Cow::Borrowed(
+                embeds
+                    .embedding(word)
+                    .or(embeds.embedding("<UNKNOWN-TOKEN>"))
+                    .expect("No unknown token embedding: <UNKNOWN_TOKEN>")
+                    .into_slice()
+                    .expect("Non-contiguous word embedding"),
+            ),
+        };
+
+        embed
+    }
+}
 
 /// Sentence represented as a vector.
 ///
 /// This data type represents a sentence as vectors (`Vec`) of tokens and
-/// part-of-speech indices. Such a vector is typically the input to a
+/// part-of-speech embeddings. Such a vector is typically the input to a
 /// sequence labeling graph.
 pub struct SentVec {
-    pub tokens: Vec<i32>,
-    pub tags: Vec<i32>,
+    pub tokens: Vec<f32>,
+    pub tags: Vec<f32>,
 }
 
 impl SentVec {
@@ -32,9 +65,9 @@ impl SentVec {
         }
     }
 
-    /// Decompose the sentence vector into vectors of token indices and
-    /// part-of-speech tag indices.
-    pub fn to_parts(self) -> (Vec<i32>, Vec<i32>) {
+    /// Decompose the sentence vector into vectors of token and
+    /// part-of-speech tag embeddings.
+    pub fn to_parts(self) -> (Vec<f32>, Vec<f32>) {
         (self.tokens, self.tags)
     }
 }
@@ -101,31 +134,15 @@ impl SentVectorizer {
             let form = token.form();
             let pos = token.pos().ok_or(format_err!("{}", token))?;
 
-            input.tokens.push(lookup_value_or_unknown(
-                self.layer_embeddings.token_embeddings.indices(),
-                form,
-            ));
+            input
+                .tokens
+                .extend_from_slice(&self.layer_embeddings.token_embeddings.embedding(form));
 
-            input.tags.push(lookup_value_or_unknown(
-                self.layer_embeddings.tag_embeddings.indices(),
-                pos,
-            ));
+            input
+                .tags
+                .extend_from_slice(&self.layer_embeddings.tag_embeddings.embedding(pos));
         }
 
         Ok(input)
     }
-}
-
-fn lookup_value_or_unknown(m: &HashMap<String, usize>, value: &str) -> i32 {
-    if let Some(idx) = m.get(value) {
-        *idx as i32
-    } else {
-        lookup_unknown(m)
-    }
-}
-
-fn lookup_unknown(m: &HashMap<String, usize>) -> i32 {
-    m.get("<UNKNOWN-TOKEN>")
-        .cloned()
-        .expect("No unknown token embedding: <UNKNOWN_TOKEN>") as i32
 }
