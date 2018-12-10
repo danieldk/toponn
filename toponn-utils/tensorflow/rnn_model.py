@@ -75,21 +75,15 @@ class RNNModel:
 
         # Inputs: tags and tokens.
         self._tokens = tf.placeholder(
-            tf.int32, [None, None], name="tokens")
-        self._tags = tf.placeholder(tf.int32, [None, None], name="tags")
+            tf.float32, [
+                None, None, shapes['token_embed_dims']], name="tokens")
+        self._tags = tf.placeholder(
+            tf.float32, [
+                None, None, shapes['tag_embed_dims']], name="tags")
         self._seq_lens = tf.placeholder(
             tf.int32, [None], name="seq_lens")
 
-        # Embeddings
-        self._token_embeds = tf.placeholder(
-            tf.float32, [None, shapes['token_embed_dims']], "token_embeds")
-        self._tag_embeds = tf.placeholder(
-            tf.float32, [None, shapes['tag_embed_dims']], "tag_embeds")
-
-        token_embeds = tf.nn.embedding_lookup(self._token_embeds, self._tokens)
-        tag_embeds = tf.nn.embedding_lookup(self._tag_embeds, self._tags)
-
-        inputs = tf.concat([token_embeds, tag_embeds], axis=2)
+        inputs = tf.concat([self._tokens, self._tags], axis=2)
 
         inputs = tf.contrib.layers.dropout(
             inputs,
@@ -155,7 +149,7 @@ class RNNModel:
             tf.argmax(
                 logits,
                 axis=2),
-            tf.int32, name = "predicted")
+            tf.int32, name="predicted")
 
         correct = tf.equal(predicted, self._labels)
 
@@ -169,7 +163,8 @@ class RNNModel:
         self._accuracy = tf.reduce_mean(correct, name="accuracy")
 
         lr = tf.placeholder(tf.float32, [], "lr")
-        self._train_op = tf.train.AdamOptimizer(lr).minimize(loss, name = "train")
+        self._train_op = tf.train.AdamOptimizer(
+            lr).minimize(loss, name="train")
 
     @property
     def accuracy(self):

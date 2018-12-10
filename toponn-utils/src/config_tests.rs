@@ -11,11 +11,11 @@ lazy_static! {
             labels: "topo.labels".to_owned(),
         },
         embeddings: Embeddings {
-            word: Embedding {
+            word: Embedding::Word2Vec {
                 filename: "word-vectors-null.bin".to_owned(),
                 normalize: true
             },
-            tag: Embedding {
+            tag: Embedding::Word2Vec {
                 filename: "tag-vectors-null.bin".to_owned(),
                 normalize: true
             },
@@ -39,8 +39,6 @@ lazy_static! {
                 tokens_op: "prediction/model/tokens".to_owned(),
                 tags_op: "prediction/model/tags".to_owned(),
                 seq_lens_op: "prediction/model/seq_lens".to_owned(),
-                token_embeds_op: "prediction/model/token_embeds".to_owned(),
-                tag_embeds_op: "prediction/model/tag_embeds".to_owned(),
                 predicted_op: "prediction/model/predicted".to_owned(),
                 accuracy_op: "prediction/model/accuracy".to_owned(),
                 loss_op: "prediction/model/loss".to_owned(),

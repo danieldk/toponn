@@ -6,8 +6,8 @@ use {Collector, Numberer, SentVectorizer};
 
 pub struct CollectedTensors {
     pub sequence_lens: Vec<Tensor<i32>>,
-    pub tokens: Vec<Tensor<i32>>,
-    pub tags: Vec<Tensor<i32>>,
+    pub tokens: Vec<Tensor<f32>>,
+    pub tags: Vec<Tensor<f32>>,
     pub labels: Vec<Tensor<i32>>,
 }
 
@@ -16,12 +16,12 @@ pub struct TensorCollector {
     vectorizer: SentVectorizer,
     batch_size: usize,
     sequence_lens: Vec<Tensor<i32>>,
-    tokens: Vec<Tensor<i32>>,
-    tags: Vec<Tensor<i32>>,
+    tokens: Vec<Tensor<f32>>,
+    tags: Vec<Tensor<f32>>,
     labels: Vec<Tensor<i32>>,
     cur_labels: Vec<Vec<i32>>,
-    cur_tokens: Vec<Vec<i32>>,
-    cur_tags: Vec<Vec<i32>>,
+    cur_tokens: Vec<Vec<f32>>,
+    cur_tags: Vec<Vec<f32>>,
 }
 
 impl TensorCollector {
@@ -53,18 +53,30 @@ impl TensorCollector {
             .enumerate()
             .for_each(|(idx, labels)| batch_seq_lens[idx] = labels.len() as i32);
 
-        let max_seq_len = self.cur_labels.iter().map(Vec::len).max().unwrap_or(0);
+        let max_seq_len = self
+            .cur_labels
+            .iter()
+            .map(Vec::len)
+            .max()
+            .expect("Cannot get maximimum sequence length of non-empty batch");
+        let token_dims = self.cur_tokens[0].len() / self.cur_labels[0].len();
+        let tag_dims = self.cur_tags[0].len() / self.cur_labels[0].len();
 
-        let mut batch_tokens = Tensor::new(&[batch_size as u64, max_seq_len as u64]);
-        let mut batch_tags = Tensor::new(&[batch_size as u64, max_seq_len as u64]);
+        let mut batch_tokens =
+            Tensor::new(&[batch_size as u64, max_seq_len as u64, token_dims as u64]);
+        let mut batch_tags = Tensor::new(&[batch_size as u64, max_seq_len as u64, tag_dims as u64]);
         let mut batch_labels = Tensor::new(&[batch_size as u64, max_seq_len as u64]);
 
         for i in 0..batch_size {
             let offset = i * max_seq_len;
+            let token_offset = offset * token_dims;
+            let tag_offset = offset * tag_dims;
             let seq_len = self.cur_labels[i].len();
 
-            batch_tokens[offset..offset + seq_len].copy_from_slice(&self.cur_tokens[i]);
-            batch_tags[offset..offset + seq_len].copy_from_slice(&self.cur_tags[i]);
+            batch_tokens[token_offset..token_offset + token_dims * seq_len]
+                .copy_from_slice(&self.cur_tokens[i]);
+            batch_tags[tag_offset..tag_offset + tag_dims * seq_len]
+                .copy_from_slice(&self.cur_tags[i]);
             batch_labels[offset..offset + seq_len].copy_from_slice(&self.cur_labels[i]);
         }
 
@@ -104,7 +116,8 @@ impl Collector for TensorCollector {
                 .ok_or(format_err!(
                     "No features field with a topological field (tf) feature: {}",
                     token
-                ))?.as_map();
+                ))?
+                .as_map();
             let opt_tf = features.get("tf").ok_or(format_err!(
                 "No features field with a topological field (tf) feature: {}",
                 token

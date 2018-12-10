@@ -3,9 +3,15 @@ extern crate conllx;
 #[macro_use]
 extern crate failure;
 
+extern crate finalfrontier;
+
 extern crate itertools;
 
+extern crate ndarray;
+
 extern crate protobuf;
+
+extern crate rust2vec;
 
 extern crate serde;
 
@@ -14,15 +20,13 @@ extern crate serde_derive;
 
 extern crate tensorflow as tf;
 
-extern crate tf_embed;
-
 extern crate tf_proto;
 
 mod collector;
 pub use collector::{Collector, NoopCollector};
 
 mod input;
-pub use input::{LayerEmbeddings, SentVec, SentVectorizer};
+pub use input::{Embeddings, LayerEmbeddings, SentVec, SentVectorizer};
 
 mod numberer;
 pub use numberer::Numberer;

@@ -3,9 +3,9 @@ use std::io::BufReader;
 use std::path::Path;
 
 use failure::Error;
+use finalfrontier::ReadModelBinary;
 use ordered_float::NotNan;
-use tf_embed;
-use tf_embed::ReadWord2Vec;
+use rust2vec::ReadWord2Vec;
 
 use toponn::tensorflow::{Model, PlateauLearningRate};
 use toponn::LayerEmbeddings;
@@ -27,9 +27,10 @@ impl Config {
         let config_path = config_path.as_ref();
 
         self.labeler.labels = relativize_path(config_path, &self.labeler.labels)?;
-        self.embeddings.word.filename =
-            relativize_path(config_path, &self.embeddings.word.filename)?;
-        self.embeddings.tag.filename = relativize_path(config_path, &self.embeddings.tag.filename)?;
+        *self.embeddings.word.filename_mut() =
+            relativize_path(config_path, &self.embeddings.word.filename_mut())?;
+        *self.embeddings.tag.filename_mut() =
+            relativize_path(config_path, &self.embeddings.tag.filename_mut())?;
         self.model.graph = relativize_path(config_path, &self.model.graph)?;
         self.model.parameters = relativize_path(config_path, &self.model.parameters)?;
 
@@ -44,9 +45,21 @@ pub struct Embeddings {
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct Embedding {
-    pub filename: String,
-    pub normalize: bool,
+#[serde(tag = "type")]
+pub enum Embedding {
+    Word2Vec { filename: String, normalize: bool },
+    FinalFrontier { filename: String },
+}
+
+impl Embedding {
+    pub fn filename_mut(&mut self) -> &mut String {
+        match self {
+            Embedding::Word2Vec {
+                ref mut filename, ..
+            } => filename,
+            Embedding::FinalFrontier { ref mut filename } => filename,
+        }
+    }
 }
 
 impl Embeddings {
@@ -60,15 +73,28 @@ impl Embeddings {
     pub fn load_layer_embeddings(
         &self,
         embeddings: &Embedding,
-    ) -> Result<tf_embed::Embeddings, Error> {
-        let f = File::open(&embeddings.filename)?;
-        let mut embeds = tf_embed::Embeddings::read_word2vec_binary(&mut BufReader::new(f))?;
+    ) -> Result<toponn::Embeddings, Error> {
+        match embeddings {
+            Embedding::Word2Vec {
+                filename,
+                normalize,
+            } => {
+                let f = File::open(filename)?;
+                let mut embeds =
+                    rust2vec::Embeddings::read_word2vec_binary(&mut BufReader::new(f))?;
 
-        if embeddings.normalize {
-            embeds.normalize()
+                if *normalize {
+                    embeds.normalize()
+                }
+
+                Ok(toponn::Embeddings::Word2Vec(embeds))
+            }
+            Embedding::FinalFrontier { filename } => {
+                let f = File::open(filename)?;
+                let model = finalfrontier::Model::read_model_binary(&mut BufReader::new(f))?;
+                Ok(toponn::Embeddings::FinalFrontier(model))
+            }
         }
-
-        Ok(embeds)
     }
 }
 
@@ -95,12 +121,14 @@ fn relativize_path(config_path: &Path, filename: &str) -> Result<String, Error> 
         .ok_or(format_err!(
             "Cannot get parent path of the configuration file: {}",
             abs_config_path.to_string_lossy()
-        ))?.join(path)
+        ))?
+        .join(path)
         .to_str()
         .ok_or(format_err!(
             "Cannot cannot convert partent path to string: {}",
             abs_config_path.to_string_lossy()
-        ))?.to_owned())
+        ))?
+        .to_owned())
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
