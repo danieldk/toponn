@@ -3,6 +3,7 @@
 import tensorflow as tf
 from tensorflow.contrib.layers import batch_norm
 from enum import Enum
+from model import Model
 
 from weight_norm import WeightNorm
 
@@ -155,30 +156,14 @@ def residual_unit(
     return conv
 
 
-class ConvModel:
+class ConvModel(Model):
     def __init__(
             self,
             config,
             shapes):
-        # Are we training or not?
-        self._is_training = tf.placeholder(tf.bool, [], "is_training")
+        super(ConvModel, self).__init__(config, shapes)
 
-        self._labels = tf.placeholder(
-            tf.int32, name="labels", shape=[
-                None, None])
-
-        # Inputs: tags and tokens.
-        self._tokens = tf.placeholder(
-            tf.float32, [
-                None, None, shapes['token_embed_dims']], name="tokens")
-        self._tags = tf.placeholder(
-            tf.float32, [
-                None, None, shapes['tag_embed_dims']], name="tags")
-
-        # Sequence lenghts
-        self._seq_lens = tf.placeholder(
-            tf.int32, [None], name="seq_lens")
-        input_mask = tf.sequence_mask(self._seq_lens, dtype=tf.float32)
+        self.setup_placeholders()
 
         inputs = tf.concat([self._tokens, self._tags], axis=2)
 
@@ -195,106 +180,30 @@ class ConvModel:
             is_training=self.is_training,
             glu=config.glu,
             keep_prob=config.keep_prob,
-            mask=input_mask)
+            mask=self.mask)
 
         # Normalize hidden layers, seems to speed up convergence.
         hidden_states = tf.contrib.layers.layer_norm(
             hidden_states, begin_norm_axis=-1)
 
-        hidden_states = tf.reshape(hidden_states, [-1, config.hidden_size])
+        topo_logits = tf.layers.dense(hidden_states, shapes['n_labels'], use_bias=True, name="topo_logits")
+        if config.crf:
+            topo_loss, transitions = self.crf_loss(
+                "topo", topo_logits, self.topo_labels)
+            topo_predictions = self.crf_predictions(
+                "topo", topo_logits, transitions)
+        else:
+            topo_loss = self.masked_softmax_loss(
+                "topo", topo_logits, self.topo_labels, self.mask)
+            topo_predictions = self.predictions("topo", topo_logits)
 
-        softmax_w = tf.get_variable(
-            "softmax_w", [
-                config.hidden_size, shapes['n_labels']])
-        softmax_b = tf.get_variable("softmax_b", [shapes['n_labels']])
-        logits = tf.nn.xw_plus_b(
-            hidden_states,
-            softmax_w,
-            softmax_b,
-            name="logits")
-
-        logits = tf.reshape(
-            logits, [
-                tf.shape(self.tokens)[0], -1, shapes['n_labels']])
-
-        losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=self._labels)
-
-        # Zero out losses for inactive steps.
-        losses = tf.multiply(input_mask, losses)
-
-        # Compensate for padded losses.
-        losses = tf.reshape(losses, [-1])
-        losses = tf.truediv(losses, tf.reduce_mean(input_mask))
-
-        self._loss = loss = tf.reduce_mean(losses, name="loss")
-
-        predicted = tf.cast(
-            tf.argmax(
-                logits,
-                axis=2),
-            tf.int32, name="predicted")
-
-        correct = tf.equal(predicted, self._labels)
-
-        # Zero out correctness for inactive steps.
-        correct = tf.multiply(input_mask, tf.cast(correct, tf.float32))
-
-        # Compensate for inactive steps
-        correct = tf.reshape(correct, [-1])
-        correct = tf.truediv(correct, tf.reduce_mean(input_mask))
-
-        self._accuracy = tf.reduce_mean(correct, name="accuracy")
+        self.accuracy("topo", topo_predictions, self.topo_labels)
 
         # Optimization with gradient clipping. Consider making the gradient
         # norm a placeholder as well.
         lr = tf.placeholder(tf.float32, [], "lr")
         optimizer = tf.train.AdamOptimizer(lr)
-        gradients, variables = zip(*optimizer.compute_gradients(loss))
+        gradients, variables = zip(*optimizer.compute_gradients(topo_loss))
         gradients, _ = tf.clip_by_global_norm(gradients, 1.0)
         self._train_op = optimizer.apply_gradients(
             zip(gradients, variables), name="train")
-
-    @property
-    def accuracy(self):
-        return self._accuracy
-
-    @property
-    def correct(self):
-        return self._correct
-
-    @property
-    def is_training(self):
-        return self._is_training
-
-    @property
-    def loss(self):
-        return self._loss
-
-    @property
-    def train_op(self):
-        return self._train_op
-
-    @property
-    def labels(self):
-        return self._labels
-
-    @property
-    def tag_embeds(self):
-        return self._tag_embeds
-
-    @property
-    def tags(self):
-        return self._tags
-
-    @property
-    def tokens(self):
-        return self._tokens
-
-    @property
-    def token_embeds(self):
-        return self._token_embeds
-
-    @property
-    def seq_lens(self):
-        return self._seq_lens
