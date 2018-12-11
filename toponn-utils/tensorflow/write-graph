@@ -51,6 +51,10 @@ if __name__ == '__main__':
         type=str,
         help='output graph file')
     parser.add_argument(
+        "--crf",
+        help="use CRF layer for classification",
+        action="store_true")
+    parser.add_argument(
         "--glu",
         help="use GLU activiation in convolutions",
         action="store_true")
@@ -88,6 +92,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = DefaultConfig()
+    config.crf = args.crf
     config.glu = args.glu
     config.hidden_size = args.hidden_size
     config.keep_prob = args.keep_prob
@@ -96,12 +101,12 @@ if __name__ == '__main__':
     config.n_levels = args.levels
 
     if args.type == 'rnn':
-        print("Model: rnn")
+        print("Model: rnn, crf: %r" % config.crf)
         model = RNNModel
     elif args.type == 'conv':
         model = ConvModel
-        print("Model: convolution, kernel: %d, levels: %d, glu: %r" %
-              (config.kernel_size, config.n_levels, config.glu))
+        print("Model: convolution, kernel: %d, levels: %d, glu: %r, crf: %r" %
+              (config.kernel_size, config.n_levels, config.glu, config.crf))
     else:
         raise "Unknown model type: %s" % config.type
 

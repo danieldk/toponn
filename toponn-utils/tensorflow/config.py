@@ -3,6 +3,7 @@ from os import path
 
 class DefaultConfig:
     init_scale = 0.05
+    crf = False
     glu = False
     hidden_size = 50
     keep_prob = 0.85
