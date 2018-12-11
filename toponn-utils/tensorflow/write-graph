@@ -21,10 +21,7 @@ def create_graph(config, model, shapes, graph_filename):
     tfconfig = tf.ConfigProto(gpu_options=gpuopts)
 
     with tf.Graph().as_default(), tf.Session(config=tfconfig) as session:
-        initializer = tf.random_uniform_initializer(-config.init_scale,
-                                                    config.init_scale)
-
-        with tf.variable_scope("model", reuse=None, initializer=initializer):
+        with tf.variable_scope("model", reuse=None):
             m = model(config=config, shapes=shapes)
 
         init = tf.variables_initializer(tf.global_variables(), name='init')
