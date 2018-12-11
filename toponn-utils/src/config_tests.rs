@@ -9,6 +9,7 @@ lazy_static! {
     static ref BASIC_LABELER_CHECK: Config = Config {
         labeler: Labeler {
             labels: "topo.labels".to_owned(),
+            read_ahead: 10,
         },
         embeddings: Embeddings {
             word: Embedding::Word2Vec {
