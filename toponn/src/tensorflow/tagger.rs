@@ -3,16 +3,17 @@ use std::io::Read;
 use std::path::Path;
 
 use conllx::Sentence;
-use failure::{err_msg, Error};
+use failure::{err_msg, format_err, Error};
 use protobuf::Message;
-use tf::{
+use serde_derive::{Deserialize, Serialize};
+use tensorflow::{
     Graph, ImportGraphDefOptions, Operation, Session, SessionOptions, SessionRunArgs, Status,
     Tensor,
 };
 
 use super::tensor::TensorBuilder;
+use crate::{ModelPerformance, Numberer, SentVectorizer, Tag};
 use tf_proto::ConfigProto;
-use {ModelPerformance, Numberer, SentVectorizer, Tag};
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct Model {

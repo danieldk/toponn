@@ -1,15 +1,3 @@
-extern crate conllx;
-
-extern crate failure;
-
-extern crate getopts;
-
-extern crate stdinout;
-
-extern crate toponn;
-
-extern crate toponn_utils;
-
 use std::collections::BTreeMap;
 use std::env::args;
 use std::fs::File;
@@ -152,16 +140,14 @@ where
     }
 
     fn tag_buffered_sentences(&mut self) -> Result<(), Error> {
-        {
-            // Sort sentences by length.
-            let mut sent_refs: Vec<_> = self.buffer.iter_mut().map(|s| s).collect();
-            sent_refs.sort_unstable_by_key(|s| s.len());
+        // Sort sentences by length.
+        let mut sent_refs: Vec<_> = self.buffer.iter_mut().map(|s| s).collect();
+        sent_refs.sort_unstable_by_key(|s| s.len());
 
-            // Split in batches, tag, and merge results.
-            for batch in sent_refs.chunks_mut(self.batch_size) {
-                let labels = labels_to_owned(self.tagger.tag_sentences(batch)?);
-                Self::merge_labels(batch, labels)?;
-            }
+        // Split in batches, tag, and merge results.
+        for batch in sent_refs.chunks_mut(self.batch_size) {
+            let labels = labels_to_owned(self.tagger.tag_sentences(batch)?);
+            Self::merge_labels(batch, labels)?;
         }
 
         // Write out sentences.
@@ -179,20 +165,18 @@ where
         W: Write,
     {
         for (tokens, sent_labels) in sentences.iter_mut().zip(labels) {
-            {
-                for (token, label) in tokens.iter_mut().zip(sent_labels) {
-                    // Obtain the feature mapping or construct a fresh one.
-                    let mut features = token
-                        .features()
-                        .map(Features::as_map)
-                        .cloned()
-                        .unwrap_or(BTreeMap::new());
+            for (token, label) in tokens.iter_mut().zip(sent_labels) {
+                // Obtain the feature mapping or construct a fresh one.
+                let mut features = token
+                    .features()
+                    .map(Features::as_map)
+                    .cloned()
+                    .unwrap_or(BTreeMap::new());
 
-                    // Insert the topological field.
-                    features.insert(String::from("tf"), Some(label));
+                // Insert the topological field.
+                features.insert(String::from("tf"), Some(label));
 
-                    token.set_features(Some(Features::from_iter(features)));
-                }
+                token.set_features(Some(Features::from_iter(features)));
             }
         }
 

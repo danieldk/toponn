@@ -2,6 +2,8 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::hash::Hash;
 
+use serde_derive::{Deserialize, Serialize};
+
 /// Numberer for categorical values, such as features or class labels.
 #[derive(Eq, PartialEq, Serialize, Deserialize)]
 pub struct Numberer<T>

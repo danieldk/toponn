@@ -2,10 +2,11 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 
-use failure::Error;
+use failure::{format_err, Error};
 use finalfrontier::ReadModelBinary;
 use ordered_float::NotNan;
 use rust2vec::ReadWord2Vec;
+use serde_derive::{Deserialize, Serialize};
 
 use toponn::tensorflow::{Model, PlateauLearningRate};
 use toponn::LayerEmbeddings;

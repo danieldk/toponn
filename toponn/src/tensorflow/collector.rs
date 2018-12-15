@@ -1,8 +1,8 @@
 use conllx::Sentence;
-use failure::Error;
-use tf::Tensor;
+use failure::{format_err, Error};
+use tensorflow::Tensor;
 
-use {Collector, Numberer, SentVectorizer};
+use crate::{Collector, Numberer, SentVectorizer};
 
 pub struct CollectedTensors {
     pub sequence_lens: Vec<Tensor<i32>>,
