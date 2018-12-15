@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use conllx::Sentence;
-use failure::Error;
+use failure::{format_err, Error};
 
 pub enum Embeddings {
     FinalFrontier(finalfrontier::Model),

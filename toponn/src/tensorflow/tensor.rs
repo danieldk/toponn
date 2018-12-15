@@ -1,8 +1,8 @@
 use std::cmp::min;
 
-use tf::Tensor;
+use tensorflow::Tensor;
 
-use SentVec;
+use crate::SentVec;
 
 pub struct TensorBuilder {
     sequence: usize,

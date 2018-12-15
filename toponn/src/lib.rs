@@ -1,41 +1,13 @@
-extern crate conllx;
-
-#[macro_use]
-extern crate failure;
-
-extern crate finalfrontier;
-
-extern crate itertools;
-
-extern crate ndarray;
-
-extern crate protobuf;
-
-extern crate rust2vec;
-
-extern crate serde;
-
-#[macro_use]
-extern crate serde_derive;
-
-extern crate tensorflow as tf;
-
-extern crate tf_proto;
-
 mod collector;
-pub use collector::{Collector, NoopCollector};
+pub use crate::collector::{Collector, NoopCollector};
 
 mod input;
-pub use input::{Embeddings, LayerEmbeddings, SentVec, SentVectorizer};
+pub use crate::input::{Embeddings, LayerEmbeddings, SentVec, SentVectorizer};
 
 mod numberer;
-pub use numberer::Numberer;
+pub use crate::numberer::Numberer;
 
 mod tag;
-pub use tag::{ModelPerformance, Tag};
+pub use crate::tag::{ModelPerformance, Tag};
 
 pub mod tensorflow;
-
-#[cfg(test)]
-#[macro_use]
-extern crate approx;

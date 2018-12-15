@@ -1,6 +1,7 @@
 [package]
 name = "toponn-utils"
 version = "0.1.0"
+edition = "2018"
 authors = ["Daniël de Kok <me@danieldk.eu>"]
 
 [dependencies]
@@ -19,4 +20,4 @@ toml = "0.4"
 toponn = { path = "../toponn" }
 
 [dev-dependencies]
-lazy_static = "0.2"
+lazy_static = "1"

@@ -1,7 +1,7 @@
 use conllx::Sentence;
 
-use failure::Error;
-use {Numberer, SentVectorizer};
+use crate::{Numberer, SentVectorizer};
+use failure::{format_err, Error};
 
 /// Data types collects (and typically stores) vectorized sentences.
 pub trait Collector {
