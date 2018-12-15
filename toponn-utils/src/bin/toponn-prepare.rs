@@ -113,8 +113,9 @@ fn main() {
     write!(
         shapes_write,
         "{}",
-        toml::to_string(&shapes).or_exit("Cannot write to shapes file", 1)
-    );
+        toml::to_string(&shapes).or_exit("Cannot serialize shapes", 1)
+    )
+    .or_exit("Cannot write to shapes file", 1);
 }
 
 fn write_labels(config: &Config, labels: &Numberer<String>) -> Result<(), Error> {
