@@ -13,18 +13,16 @@ lazy_static! {
             read_ahead: 10,
         },
         embeddings: Embeddings {
-            word: Embedding::Word2Vec {
+            word: Embedding {
                 filename: "word-vectors-null.bin".to_owned(),
-                normalize: true
             },
-            tag: Embedding::Word2Vec {
+            tag: Embedding {
                 filename: "tag-vectors-null.bin".to_owned(),
-                normalize: true
             },
         },
         train: Train {
-            initial_lr: NotNan::from(0.05),
-            lr_scale: NotNan::from(0.5),
+            initial_lr: 0.05.into(),
+            lr_scale: 0.5.into(),
             lr_patience: 4,
             patience: 10,
         },

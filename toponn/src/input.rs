@@ -1,40 +1,48 @@
-use std::borrow::Cow;
-
 use conllx::Sentence;
 use failure::{format_err, Error};
+use ndarray::Array1;
+use rust2vec::{
+    embeddings::Embeddings as R2VEmbeddings,
+    storage::StorageWrap,
+    storage::{CowArray, CowArray1},
+    vocab::VocabWrap,
+};
 
-pub enum Embeddings {
-    FinalFrontier(finalfrontier::Model),
-    Word2Vec(rust2vec::Embeddings),
+pub struct Embeddings {
+    embeddings: R2VEmbeddings<VocabWrap, StorageWrap>,
+    unknown: Array1<f32>,
 }
 
 impl Embeddings {
     pub fn dims(&self) -> usize {
-        match self {
-            Embeddings::FinalFrontier(model) => model.config().dims as usize,
-            Embeddings::Word2Vec(embeds) => embeds.embed_len(),
-        }
+        self.embeddings.dims()
     }
 
-    pub fn embedding(&self, word: &str) -> Cow<[f32]> {
-        let embed = match self {
-            Embeddings::FinalFrontier(model) => Cow::Owned(
-                model
-                    .embedding(word)
-                    .expect("Cannot retrieve embedding.")
-                    .into_raw_vec(),
-            ),
-            Embeddings::Word2Vec(embeds) => Cow::Borrowed(
-                embeds
-                    .embedding(word)
-                    .or(embeds.embedding("<UNKNOWN-TOKEN>"))
-                    .expect("No unknown token embedding: <UNKNOWN_TOKEN>")
-                    .into_slice()
-                    .expect("Non-contiguous word embedding"),
-            ),
-        };
+    pub fn embedding(&self, word: &str) -> CowArray1<f32> {
+        self.embeddings
+            .embedding(word)
+            .unwrap_or_else(|| CowArray::Borrowed(self.unknown.view()))
+    }
+}
 
-        embed
+impl From<R2VEmbeddings<VocabWrap, StorageWrap>> for Embeddings {
+    fn from(embeddings: R2VEmbeddings<VocabWrap, StorageWrap>) -> Self {
+        let mut unknown = Array1::zeros(embeddings.dims());
+
+        for (_, embed) in &embeddings {
+            unknown += &embed.as_view();
+        }
+
+        let l2norm = unknown.dot(&unknown).sqrt();
+
+        if l2norm != 0f32 {
+            unknown /= l2norm;
+        }
+
+        Embeddings {
+            embeddings,
+            unknown,
+        }
     }
 }
 
@@ -134,13 +142,25 @@ impl SentVectorizer {
             let form = token.form();
             let pos = token.pos().ok_or(format_err!("{}", token))?;
 
-            input
-                .tokens
-                .extend_from_slice(&self.layer_embeddings.token_embeddings.embedding(form));
+            input.tokens.extend_from_slice(
+                &self
+                    .layer_embeddings
+                    .token_embeddings
+                    .embedding(form)
+                    .as_view()
+                    .as_slice()
+                    .expect("Non-contiguous embedding"),
+            );
 
-            input
-                .tags
-                .extend_from_slice(&self.layer_embeddings.tag_embeddings.embedding(pos));
+            input.tags.extend_from_slice(
+                &self
+                    .layer_embeddings
+                    .tag_embeddings
+                    .embedding(pos)
+                    .as_view()
+                    .as_slice()
+                    .expect("Non-contiguous embedding"),
+            );
         }
 
         Ok(input)
