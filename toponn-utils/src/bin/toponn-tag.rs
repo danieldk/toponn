@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::env::args;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -33,7 +32,7 @@ fn main() {
         return;
     }
 
-    if matches.free.len() == 0 || matches.free.len() > 3 {
+    if matches.free.is_empty() || matches.free.len() > 3 {
         print_usage(&program, opts);
         return;
     }
@@ -171,7 +170,7 @@ where
                     .features()
                     .map(Features::as_map)
                     .cloned()
-                    .unwrap_or(BTreeMap::new());
+                    .unwrap_or_default();
 
                 // Insert the topological field.
                 features.insert(String::from("tf"), Some(label));

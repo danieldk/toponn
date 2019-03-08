@@ -1,4 +1,4 @@
-use conllx::Sentence;
+use conllx::Token;
 use failure::{format_err, Error};
 use ndarray::Array1;
 use rust2vec::{
@@ -51,6 +51,7 @@ impl From<R2VEmbeddings<VocabWrap, StorageWrap>> for Embeddings {
 /// This data type represents a sentence as vectors (`Vec`) of tokens and
 /// part-of-speech embeddings. Such a vector is typically the input to a
 /// sequence labeling graph.
+#[derive(Default)]
 pub struct SentVec {
     pub tokens: Vec<f32>,
     pub tags: Vec<f32>,
@@ -75,7 +76,7 @@ impl SentVec {
 
     /// Decompose the sentence vector into vectors of token and
     /// part-of-speech tag embeddings.
-    pub fn to_parts(self) -> (Vec<f32>, Vec<f32>) {
+    pub fn into_parts(self) -> (Vec<f32>, Vec<f32>) {
         (self.tokens, self.tags)
     }
 }
@@ -93,8 +94,8 @@ impl LayerEmbeddings {
     /// Construct `LayerEmbeddings` from the given embeddings.
     pub fn new(token_embeddings: Embeddings, tag_embeddings: Embeddings) -> Self {
         LayerEmbeddings {
-            token_embeddings: token_embeddings,
-            tag_embeddings: tag_embeddings,
+            token_embeddings,
+            tag_embeddings,
         }
     }
 
@@ -124,9 +125,7 @@ impl SentVectorizer {
     /// embeddings are used to find the indices into the embedding matrix for
     /// layer values.
     pub fn new(layer_embeddings: LayerEmbeddings) -> Self {
-        SentVectorizer {
-            layer_embeddings: layer_embeddings,
-        }
+        SentVectorizer { layer_embeddings }
     }
 
     /// Get the layer embeddings.
@@ -135,12 +134,12 @@ impl SentVectorizer {
     }
 
     /// Vectorize a sentence.
-    pub fn realize(&self, sentence: &Sentence) -> Result<SentVec, Error> {
+    pub fn realize(&self, sentence: &[Token]) -> Result<SentVec, Error> {
         let mut input = SentVec::with_capacity(sentence.len());
 
         for token in sentence {
             let form = token.form();
-            let pos = token.pos().ok_or(format_err!("{}", token))?;
+            let pos = token.pos().ok_or_else(|| format_err!("{}", token))?;
 
             input.tokens.extend_from_slice(
                 &self

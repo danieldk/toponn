@@ -1,4 +1,4 @@
-use conllx::Sentence;
+use conllx::Token;
 use failure::{format_err, Error};
 use tensorflow::Tensor;
 
@@ -103,7 +103,7 @@ impl TensorCollector {
 }
 
 impl Collector for TensorCollector {
-    fn collect(&mut self, sentence: &Sentence) -> Result<(), Error> {
+    fn collect(&mut self, sentence: &[Token]) -> Result<(), Error> {
         if self.cur_labels.len() == self.batch_size {
             self.finalize_batch();
         }
@@ -113,24 +113,27 @@ impl Collector for TensorCollector {
         for token in sentence {
             let features = token
                 .features()
-                .ok_or(format_err!(
+                .ok_or_else(|| {
+                    format_err!(
+                        "No features field with a topological field (tf) feature: {}",
+                        token
+                    )
+                })?
+                .as_map();
+            let opt_tf = features.get("tf").ok_or_else(|| {
+                format_err!(
                     "No features field with a topological field (tf) feature: {}",
                     token
-                ))?
-                .as_map();
-            let opt_tf = features.get("tf").ok_or(format_err!(
-                "No features field with a topological field (tf) feature: {}",
-                token
-            ))?;
-            let tf = opt_tf.clone().ok_or(format_err!(
-                "Topological field feature (tf) without a value: {}",
-                token
-            ))?;
+                )
+            })?;
+            let tf = opt_tf.clone().ok_or_else(|| {
+                format_err!("Topological field feature (tf) without a value: {}", token)
+            })?;
 
             labels.push(self.numberer.add(tf.to_owned()) as i32);
         }
 
-        let (tokens, tags) = input.to_parts();
+        let (tokens, tags) = input.into_parts();
         self.cur_tokens.push(tokens);
         self.cur_tags.push(tags);
         self.cur_labels.push(labels);

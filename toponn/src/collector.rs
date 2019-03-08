@@ -1,11 +1,11 @@
-use conllx::Sentence;
+use conllx::Token;
 
 use crate::{Numberer, SentVectorizer};
 use failure::{format_err, Error};
 
 /// Data types collects (and typically stores) vectorized sentences.
 pub trait Collector {
-    fn collect(&mut self, sentence: &Sentence) -> Result<(), Error>;
+    fn collect(&mut self, sentence: &[Token]) -> Result<(), Error>;
 
     fn vectorizer(&self) -> &SentVectorizer;
 }
@@ -33,25 +33,28 @@ impl NoopCollector {
 }
 
 impl Collector for NoopCollector {
-    fn collect(&mut self, sentence: &Sentence) -> Result<(), Error> {
+    fn collect(&mut self, sentence: &[Token]) -> Result<(), Error> {
         self.vectorizer.realize(sentence)?;
 
         for token in sentence {
             let features = token
                 .features()
-                .ok_or(format_err!(
+                .ok_or_else(|| {
+                    format_err!(
+                        "No features field with a topological field (tf) feature: {}",
+                        token
+                    )
+                })?
+                .as_map();
+            let opt_tf = features.get("tf").ok_or_else(|| {
+                format_err!(
                     "No features field with a topological field (tf) feature: {}",
                     token
-                ))?
-                .as_map();
-            let opt_tf = features.get("tf").ok_or(format_err!(
-                "No features field with a topological field (tf) feature: {}",
-                token
-            ))?;
-            let tf = opt_tf.clone().ok_or(format_err!(
-                "Topological field feature (tf) without a value: {}",
-                token
-            ))?;
+                )
+            })?;
+            let tf = opt_tf.clone().ok_or_else(|| {
+                format_err!("Topological field feature (tf) without a value: {}", token)
+            })?;
 
             self.numberer.add(tf.to_owned());
         }
