@@ -23,7 +23,8 @@ def rnn_layers(
         output_dropout=1,
         state_dropout=1,
         seq_lens=None,
-        bidirectional=False):
+        bidirectional=False,
+        attention=False):
     forward_cell = tf.contrib.rnn.BasicLSTMCell(output_size)
     forward_cell = dropout_wrapper(
         cell=forward_cell,
@@ -31,6 +32,9 @@ def rnn_layers(
         keep_prob=output_dropout)
 
     if not bidirectional:
+        if attention:
+            attention_mechanism = tf.contrib.seq2seq.LuongMonotonicAttention(num_units=output_size, memory=inputs, memory_sequence_length=seq_lens)
+            forward_cell = tf.contrib.seq2seq.AttentionWrapper(forward_cell, attention_mechanism, attention_layer_size=output_size)
         return tf.nn.dynamic_rnn(
             forward_cell,
             inputs,
@@ -80,7 +84,8 @@ class RNNModel(Model):
 
         hidden_states, _ = rnn_layers(self.is_training, hidden_states, num_layers=1, output_size=config.hidden_size,
                                       output_dropout=config.keep_prob,
-                                      state_dropout=config.keep_prob, seq_lens=self._seq_lens)
+                                      state_dropout=config.keep_prob, seq_lens=self._seq_lens, attention=True)
+        print(hidden_states)
 
         hidden_states = batch_norm(
             hidden_states,
