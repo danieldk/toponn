@@ -3,9 +3,9 @@ use std::io::BufReader;
 use std::path::Path;
 
 use failure::{format_err, Error};
+use finalfusion::embeddings::Embeddings as FiFuEmbeddings;
+use finalfusion::prelude::*;
 use ordered_float::NotNan;
-use rust2vec::embeddings::Embeddings as R2VEmbeddings;
-use rust2vec::prelude::*;
 use serde_derive::{Deserialize, Serialize};
 
 use toponn::tensorflow::{Model, PlateauLearningRate};
@@ -62,7 +62,7 @@ impl Embeddings {
         embeddings: &Embedding,
     ) -> Result<toponn::Embeddings, Error> {
         let f = File::open(&embeddings.filename)?;
-        let embeds: R2VEmbeddings<VocabWrap, StorageWrap> =
+        let embeds: FiFuEmbeddings<VocabWrap, StorageWrap> =
             ReadEmbeddings::read_embeddings(&mut BufReader::new(f))?;
         Ok(embeds.into())
     }
